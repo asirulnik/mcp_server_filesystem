@@ -13,13 +13,12 @@ readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/yourusername/mcp-server-filesystem"
-"Bug Tracker" = "https://github.com/yourusername/mcp-server-filesystem/issues"
+"Homepage" = "https://github.com/MarcusJellinghaus/mcp-server-filesystem"
+"Bug Tracker" = "https://github.com/MarcusJellinghaus/mcp-server-filesystem/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
