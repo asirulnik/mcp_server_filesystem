@@ -43,10 +43,8 @@ async def list_files_endpoint(request: ListFilesRequest) -> dict[str, Any]:
         return {"files": files}
     except (FileNotFoundError, NotADirectoryError, PermissionError) as e:
         logger.error(f"Error listing files: {str(e)}")
-        raise HTTPException(status_code=400, detail={
-            "error": str(e),
-            "error_type": type(e).__name__
-        })
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        raise HTTPException(status_code=400, detail=error_detail)
 
 
 @app.post("/read_file", response_model=ReadFileResponse, responses={400: {"model": ErrorResponse}})
@@ -65,10 +63,8 @@ async def read_file_endpoint(request: ReadFileRequest) -> dict[str, Any]:
         return {"content": content}
     except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
         logger.error(f"Error reading file: {str(e)}")
-        raise HTTPException(status_code=400, detail={
-            "error": str(e),
-            "error_type": type(e).__name__
-        })
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        raise HTTPException(status_code=400, detail=error_detail)
 
 
 @app.post("/write_file", response_model=WriteFileResponse, responses={400: {"model": ErrorResponse}})
@@ -87,7 +83,5 @@ async def write_file_endpoint(request: WriteFileRequest) -> dict[str, Any]:
         return {"success": success}
     except PermissionError as e:
         logger.error(f"Error writing file: {str(e)}")
-        raise HTTPException(status_code=400, detail={
-            "error": str(e),
-            "error_type": type(e).__name__
-        })
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        raise HTTPException(status_code=400, detail=error_detail)

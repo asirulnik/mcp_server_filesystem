@@ -42,5 +42,4 @@ class WriteFileResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Error response model."""
     
-    error: str = Field(..., description="Error message")
-    error_type: str | None = Field(None, description="Type of error")
+    detail: str = Field(..., description="Error message")
