@@ -52,6 +52,40 @@ def test_write_file():
     assert content == TEST_CONTENT
 
 
+def test_write_file_atomic_overwrite():
+    """Test atomically overwriting an existing file."""
+    # Create absolute path for test file
+    abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
+    
+    # Create initial content
+    initial_content = "This is the initial content."
+    with open(abs_file_path, 'w', encoding='utf-8') as f:
+        f.write(initial_content)
+    
+    # Verify initial content
+    with open(abs_file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    assert content == initial_content
+    
+    # Overwrite with new content
+    new_content = "This is the new content that replaces the old content."
+    result = write_file(str(TEST_FILE), new_content)
+    
+    # Verify the file was written
+    assert result is True
+    assert abs_file_path.exists()
+    
+    # Verify the new content
+    with open(abs_file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    assert content == new_content
+    
+    # Verify no temporary files were left behind
+    parent_dir = abs_file_path.parent
+    temp_files = [f for f in parent_dir.iterdir() if f.name.startswith('tmp') and f != abs_file_path]
+    assert len(temp_files) == 0
+
+
 def test_read_file():
     """Test reading from a file."""
     # Create an absolute path for test file creation

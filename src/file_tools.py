@@ -1,6 +1,7 @@
 """File operation tools for MCP server."""
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -217,7 +218,7 @@ def read_file(file_path: str) -> str:
 
 def write_file(file_path: str, content: str) -> bool:
     """
-    Write content to a file.
+    Write content to a file atomically.
     
     Args:
         file_path: Path to the file to write to (relative to project directory)
@@ -245,19 +246,46 @@ def write_file(file_path: str, content: str) -> bool:
         logger.error(f"Error creating directory {abs_path.parent}: {str(e)}")
         raise
     
-    file_handle = None
+    # Use a temporary file for atomic write
+    temp_file = None
     try:
-        logger.debug(f"Writing to file: {rel_path}")
-        file_handle = open(abs_path, 'w', encoding='utf-8')
-        file_handle.write(content)
+        # Create a temporary file in the same directory as the target
+        # This ensures the atomic move works across filesystems
+        temp_fd, temp_path = tempfile.mkstemp(dir=str(abs_path.parent))
+        temp_file = Path(temp_path)
+        
+        logger.debug(f"Writing to temporary file for {rel_path}")
+        
+        # Write content to temporary file
+        with open(temp_fd, 'w', encoding='utf-8') as f:
+            try:
+                f.write(content)
+            except UnicodeEncodeError as e:
+                logger.error(f"Unicode encode error while writing to {rel_path}: {str(e)}")
+                raise ValueError(f"Content contains characters that cannot be encoded. Please check the encoding.") from e
+        
+        # Atomically replace the target file
+        logger.debug(f"Atomically replacing {rel_path} with temporary file")
+        try:
+            # On Windows, we need to remove the target file first
+            if os.name == 'nt' and abs_path.exists():
+                abs_path.unlink()
+            os.replace(temp_path, str(abs_path))
+        except Exception as e:
+            logger.error(f"Error replacing file {rel_path}: {str(e)}")
+            raise
+            
         logger.debug(f"Successfully wrote {len(content)} bytes to {rel_path}")
         return True
-    except UnicodeEncodeError as e:
-        logger.error(f"Unicode encode error while writing to {rel_path}: {str(e)}")
-        raise ValueError(f"Content contains characters that cannot be encoded. Please check the encoding.") from e
+        
     except Exception as e:
         logger.error(f"Error writing to file {rel_path}: {str(e)}")
         raise
+        
     finally:
-        if file_handle is not None:
-            file_handle.close()
+        # Clean up the temporary file if it still exists
+        if temp_file and temp_file.exists():
+            try:
+                temp_file.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary file {temp_file}: {str(e)}")

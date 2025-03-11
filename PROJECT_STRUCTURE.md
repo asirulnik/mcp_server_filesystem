@@ -35,7 +35,7 @@ Contains core file system operation functions:
 
 - `list_files`: Lists all files in a directory with optional .gitignore filtering and .git folder exclusion (paths are relative to project directory)
 - `read_file`: Reads content from a file (path is relative to project directory)
-- `write_file`: Writes content to a file (path is relative to project directory)
+- `write_file`: Writes content to a file atomically (path is relative to project directory)
 - `normalize_path`: Ensures paths are within the project directory
 - `get_project_dir`: Retrieves the configured project directory
 
