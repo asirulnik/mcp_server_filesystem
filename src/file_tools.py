@@ -49,7 +49,10 @@ def normalize_path(path: str) -> tuple[Path, str]:
             relative_path = path_obj.relative_to(project_dir)
             return path_obj, str(relative_path)
         except ValueError:
-            raise ValueError(f"Path '{path}' is outside the project directory")
+            raise ValueError(
+                f"Security error: Path '{path}' is outside the project directory '{project_dir}'. "
+                f"All file operations must be within the project directory."
+            )
     
     # If the path is already relative, make sure it doesn't try to escape
     absolute_path = project_dir / path_obj
@@ -61,14 +64,24 @@ def normalize_path(path: str) -> tuple[Path, str]:
             project_resolved = project_dir.resolve()
             # Check if the resolved path starts with the resolved project dir
             if os.path.commonpath([resolved_path, project_resolved]) != str(project_resolved):
-                raise ValueError(f"Path '{path}' is outside the project directory")
+                raise ValueError(
+                    f"Security error: Path '{path}' resolves to a location outside "
+                    f"the project directory '{project_dir}'. Path traversal is not allowed."
+                )
         except (FileNotFoundError, OSError):
             # During testing with non-existent paths, just do a simple string check
             pass
             
         return absolute_path, str(path_obj)
     except ValueError as e:
-        raise ValueError(f"Path '{path}' is outside the project directory") from e
+        # If the error already has our detailed message, pass it through
+        if "Security error:" in str(e):
+            raise
+        # Otherwise add more context
+        raise ValueError(
+            f"Security error: Path '{path}' is outside the project directory '{project_dir}'. "
+            f"All file operations must be within the project directory."
+        ) from e
 
 
 def list_files(directory: str, use_gitignore: bool = True) -> list[str]:
