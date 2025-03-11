@@ -109,3 +109,69 @@ def test_list_files_directory_not_found():
     assert response.status_code == 400
     response_data = response.json()
     assert "FileNotFoundError" in response_data["detail"]
+
+
+def test_list_files_endpoint_with_gitignore():
+    """Test the list_files endpoint with gitignore filtering."""
+    # Create a .gitignore file
+    gitignore_path = TEST_DIR / ".gitignore"
+    with open(gitignore_path, 'w', encoding='utf-8') as f:
+        f.write("*.ignore\n")
+    
+    # Create a test file that should be ignored
+    test_ignore_file = TEST_DIR / "test.ignore"
+    with open(test_ignore_file, 'w', encoding='utf-8') as f:
+        f.write("This should be ignored")
+    
+    # Create a test file that should not be ignored
+    test_normal_file = TEST_DIR / "test_normal.txt"
+    with open(test_normal_file, 'w', encoding='utf-8') as f:
+        f.write("This should not be ignored")
+    
+    # Test with gitignore filtering enabled (default)
+    request = ListFilesRequest(directory=str(TEST_DIR))
+    response = client.post("/list_files", json=request.model_dump())
+    
+    assert response.status_code == 200
+    files = response.json()["files"]
+    assert "test_normal.txt" in files
+    assert ".gitignore" in files
+    assert "test.ignore" not in files
+    
+    # Clean up
+    gitignore_path.unlink()
+    test_ignore_file.unlink()
+    test_normal_file.unlink()
+
+
+def test_list_files_endpoint_without_gitignore():
+    """Test the list_files endpoint without gitignore filtering."""
+    # Create a .gitignore file
+    gitignore_path = TEST_DIR / ".gitignore"
+    with open(gitignore_path, 'w', encoding='utf-8') as f:
+        f.write("*.ignore\n")
+    
+    # Create a test file that would normally be ignored
+    test_ignore_file = TEST_DIR / "test.ignore"
+    with open(test_ignore_file, 'w', encoding='utf-8') as f:
+        f.write("This would normally be ignored")
+    
+    # Create a test file that would not be ignored
+    test_normal_file = TEST_DIR / "test_normal.txt"
+    with open(test_normal_file, 'w', encoding='utf-8') as f:
+        f.write("This would not be ignored")
+    
+    # Test with gitignore filtering disabled
+    request = ListFilesRequest(directory=str(TEST_DIR), use_gitignore=False)
+    response = client.post("/list_files", json=request.model_dump())
+    
+    assert response.status_code == 200
+    files = response.json()["files"]
+    assert "test_normal.txt" in files
+    assert ".gitignore" in files
+    assert "test.ignore" in files
+    
+    # Clean up
+    gitignore_path.unlink()
+    test_ignore_file.unlink()
+    test_normal_file.unlink()

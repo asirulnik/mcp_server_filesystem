@@ -39,7 +39,7 @@ async def list_files_endpoint(request: ListFilesRequest) -> dict[str, Any]:
         A response with the list of files
     """
     try:
-        files = list_files(request.directory)
+        files = list_files(request.directory, request.use_gitignore)
         return {"files": files}
     except (FileNotFoundError, NotADirectoryError, PermissionError) as e:
         logger.error(f"Error listing files: {str(e)}")

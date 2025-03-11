@@ -6,6 +6,7 @@ class ListFilesRequest(BaseModel):
     """Request model for list_files operation."""
     
     directory: str = Field(..., description="Directory path to list files from")
+    use_gitignore: bool = Field(True, description="Whether to filter files based on .gitignore patterns")
 
 
 class ListFilesResponse(BaseModel):

@@ -3,14 +3,17 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from pathspec import PathSpec
+from pathspec.patterns import GitWildMatchPattern
 logger = logging.getLogger(__name__)
 
-def list_files(directory: str) -> list[str]:
+def list_files(directory: str, use_gitignore: bool = True) -> list[str]:
     """
     List all files in a directory.
     
     Args:
         directory: Path to the directory to list files from
+        use_gitignore: Whether to filter results based on .gitignore patterns (default: True)
         
     Returns:
         A list of filenames in the directory
@@ -26,7 +29,40 @@ def list_files(directory: str) -> list[str]:
     if not path.is_dir():
         raise NotADirectoryError(f"Path '{directory}' is not a directory")
     
-    return [str(f.name) for f in path.iterdir()]
+    # Get all files in the directory
+    all_files = [str(f.name) for f in path.iterdir()]
+    
+    # If gitignore filtering is not requested, return all files
+    if not use_gitignore:
+        return all_files
+    
+    # Check if a .gitignore file exists in the directory
+    gitignore_path = path / ".gitignore"
+    if not gitignore_path.exists() or not gitignore_path.is_file():
+        # No .gitignore file found, return all files
+        return all_files
+    
+    try:
+        # Read and parse .gitignore file
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            gitignore_patterns = f.read().splitlines()
+        
+        # Create PathSpec object for pattern matching
+        spec = PathSpec.from_lines(GitWildMatchPattern, gitignore_patterns)
+        
+        # Filter files based on gitignore patterns
+        # Convert to full paths for matching, then extract names back
+        filtered_files = [
+            item for item in all_files 
+            if not spec.match_file(item) and not spec.match_file(f"{item}/")
+        ]
+        
+        return filtered_files
+    
+    except Exception as e:
+        # If there's an error parsing .gitignore, log it and return all files
+        logger.warning(f"Error applying gitignore filter: {str(e)}. Returning all files.")
+        return all_files
 
 
 def read_file(file_path: str) -> str:

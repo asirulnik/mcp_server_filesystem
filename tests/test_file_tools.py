@@ -78,6 +78,64 @@ def test_list_files():
     assert TEST_FILE.name in files
 
 
+def test_list_files_with_gitignore():
+    """Test listing files with gitignore filtering."""
+    # Create a test directory with files
+    test_dir = TEST_DIR
+    test_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create some test files
+    (test_dir / "normal.txt").touch()
+    (test_dir / "test.ignore").touch()
+    ignored_dir = test_dir / "ignored_dir"
+    ignored_dir.mkdir(exist_ok=True)
+    (ignored_dir / "ignored_file.txt").touch()
+    
+    # Test listing files with gitignore filtering
+    files = list_files(str(test_dir))
+    
+    # The .gitignore should exclude *.ignore files and the ignored_dir/
+    assert "normal.txt" in files
+    assert ".gitignore" in files
+    assert "test.ignore" not in files
+    assert "ignored_dir" not in files
+    
+    # Clean up
+    (test_dir / "normal.txt").unlink()
+    (test_dir / "test.ignore").unlink()
+    (ignored_dir / "ignored_file.txt").unlink()
+    ignored_dir.rmdir()
+
+
+def test_list_files_without_gitignore():
+    """Test listing files without gitignore filtering."""
+    # Create a test directory with files
+    test_dir = TEST_DIR
+    test_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create some test files
+    (test_dir / "normal.txt").touch()
+    (test_dir / "test.ignore").touch()
+    ignored_dir = test_dir / "ignored_dir"
+    ignored_dir.mkdir(exist_ok=True)
+    (ignored_dir / "ignored_file.txt").touch()
+    
+    # Test listing files without gitignore filtering
+    files = list_files(str(test_dir), use_gitignore=False)
+    
+    # When gitignore is disabled, all files should be included
+    assert "normal.txt" in files
+    assert ".gitignore" in files
+    assert "test.ignore" in files
+    assert "ignored_dir" in files
+    
+    # Clean up
+    (test_dir / "normal.txt").unlink()
+    (test_dir / "test.ignore").unlink()
+    (ignored_dir / "ignored_file.txt").unlink()
+    ignored_dir.rmdir()
+
+
 def test_list_files_directory_not_found():
     """Test listing files in a directory that doesn't exist."""
     non_existent_dir = TEST_DIR / "non_existent_dir"

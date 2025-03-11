@@ -4,7 +4,7 @@ A simple Model Context Protocol (MCP) server with file operation tools. This ser
 
 ## Features
 
-- `list_files`: List all files in a directory
+- `list_files`: List all files in a directory (with optional .gitignore filtering)
 - `read_file`: Read the contents of a file
 - `write_file`: Write content to a file
 
@@ -49,9 +49,11 @@ python -m src.main --base-dir /path/to/base/directory
 - **Request Body**:
   ```json
   {
-    "directory": "/path/to/directory"
+    "directory": "/path/to/directory",
+    "use_gitignore": true
   }
   ```
+  *Note: `use_gitignore` is optional and defaults to `true`*
 - **Response**:
   ```json
   {
