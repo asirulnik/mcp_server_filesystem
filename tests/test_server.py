@@ -2,7 +2,11 @@
 import os
 import sys
 from pathlib import Path
+
 from fastapi.testclient import TestClient
+
+from src.models import ListFilesRequest, ReadFileRequest, WriteFileRequest
+from src.server import app
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -10,10 +14,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # Set up the project directory for testing
 os.environ["MCP_PROJECT_DIR"] = os.path.abspath(os.path.dirname(__file__))
 
-from src.server import app
-from src.models import (
-    ListFilesRequest, ReadFileRequest, WriteFileRequest
-)
 
 # Create a test client
 client = TestClient(app)

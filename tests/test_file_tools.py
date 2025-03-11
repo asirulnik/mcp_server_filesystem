@@ -1,8 +1,12 @@
 """Tests for file_tools module."""
 import os
+import shutil
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
+
+from src.file_tools import list_files, read_file, write_file
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -10,7 +14,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # Set up the project directory for testing
 os.environ["MCP_PROJECT_DIR"] = os.path.abspath(os.path.dirname(__file__))
 
-from src.file_tools import list_files, read_file, write_file
 
 # Test constants
 TEST_DIR = Path("testdata/test_file_tools")
@@ -21,17 +24,49 @@ TEST_CONTENT = "This is test content."
 def setup_function():
     """Setup for each test function."""
     # Ensure the test directory exists
-    TEST_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Make absolute path for test operations
     abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
+    abs_test_dir.mkdir(parents=True, exist_ok=True)
 
 
 def teardown_function():
     """Teardown for each test function."""
-    # Clean up any test files
-    if TEST_FILE.exists():
-        TEST_FILE.unlink()
+    # Clean up all created files
+    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
+    
+    try:
+        # List of files and patterns to remove
+        files_to_remove = [
+            "test_file.txt", 
+            "normal.txt", 
+            "test.ignore",
+            "test_api_file.txt",
+            "test_normal.txt"
+        ]
+        
+        # Remove specific files
+        for filename in files_to_remove:
+            file_path = abs_test_dir / filename
+            if file_path.exists():
+                file_path.unlink()
+        
+        # Remove .git directory
+        git_dir = abs_test_dir / ".git"
+        if git_dir.exists():
+            shutil.rmtree(git_dir)
+        
+        # Remove ignored_dir if it exists
+        ignored_dir = abs_test_dir / "ignored_dir"
+        if ignored_dir.exists():
+            shutil.rmtree(ignored_dir)
+        
+        # Remove any leftover temporary files
+        for item in abs_test_dir.iterdir():
+            if item.is_file() and (item.name.startswith('tmp') or item.name.endswith('.txt')):
+                item.unlink()
+            elif item.is_dir() and item.name not in ['.git', 'ignored_dir']:
+                shutil.rmtree(item)
+    except Exception as e:
+        print(f"Error during teardown: {e}")
 
 
 def test_write_file():
@@ -165,15 +200,6 @@ def test_list_files_with_gitignore():
     assert "test.ignore" not in files
     assert "ignored_dir" not in files
     assert ".git" not in files
-    
-    # Clean up
-    (abs_test_dir / "normal.txt").unlink()
-    (abs_test_dir / "test.ignore").unlink()
-    (ignored_dir / "ignored_file.txt").unlink()
-    ignored_dir.rmdir()
-    (git_dir / "HEAD").unlink()
-    git_dir.rmdir()
-    (abs_test_dir / ".gitignore").unlink()
 
 
 def test_list_files_without_gitignore():
@@ -209,15 +235,6 @@ def test_list_files_without_gitignore():
     assert "test.ignore" in files
     assert "ignored_dir" in files
     assert ".git" in files
-    
-    # Clean up
-    (abs_test_dir / "normal.txt").unlink()
-    (abs_test_dir / "test.ignore").unlink()
-    (ignored_dir / "ignored_file.txt").unlink()
-    ignored_dir.rmdir()
-    (git_dir / "HEAD").unlink()
-    git_dir.rmdir()
-    (abs_test_dir / ".gitignore").unlink()
 
 
 def test_list_files_directory_not_found():

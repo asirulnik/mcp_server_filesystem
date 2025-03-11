@@ -1,24 +1,27 @@
 """MCP server implementation with file operation tools."""
+
 import logging
-from typing import Any
 import traceback
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
-from src.models import (
-    ListFilesRequest, ListFilesResponse,
-    ReadFileRequest, ReadFileResponse,
-    WriteFileRequest, WriteFileResponse,
-    ErrorResponse
-)
 from src.file_tools import list_files, read_file, write_file
+from src.models import (
+    ErrorResponse,
+    ListFilesRequest,
+    ListFilesResponse,
+    ReadFileRequest,
+    ReadFileResponse,
+    WriteFileRequest,
+    WriteFileResponse,
+)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -26,7 +29,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="MCP File Tools Server",
     description="A simple Model Context Protocol server with file operation tools",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 
@@ -36,10 +39,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """Handle validation errors in API requests."""
     error_detail = f"Validation error: {str(exc)}"
     logger.warning(f"{error_detail} - Path: {request.url.path}")
-    return JSONResponse(
-        status_code=400,
-        content={"detail": error_detail}
-    )
+    return JSONResponse(status_code=400, content={"detail": error_detail})
 
 
 @app.exception_handler(ValueError)
@@ -48,16 +48,10 @@ async def value_error_handler(request: Request, exc: ValueError):
     error_detail = str(exc)
     if "Security error:" in error_detail:
         logger.warning(f"Security violation: {error_detail} - Path: {request.url.path}")
-        return JSONResponse(
-            status_code=403,
-            content={"detail": error_detail}
-        )
+        return JSONResponse(status_code=403, content={"detail": error_detail})
     else:
         logger.warning(f"Validation error: {error_detail} - Path: {request.url.path}")
-        return JSONResponse(
-            status_code=400,
-            content={"detail": error_detail}
-        )
+        return JSONResponse(status_code=400, content={"detail": error_detail})
 
 
 @app.exception_handler(FileNotFoundError)
@@ -65,10 +59,7 @@ async def file_not_found_handler(request: Request, exc: FileNotFoundError):
     """Handle file not found errors."""
     error_detail = f"FileNotFoundError: {str(exc)}"
     logger.info(f"File not found: {str(exc)} - Path: {request.url.path}")
-    return JSONResponse(
-        status_code=404,
-        content={"detail": error_detail}
-    )
+    return JSONResponse(status_code=404, content={"detail": error_detail})
 
 
 @app.exception_handler(Exception)
@@ -77,31 +68,32 @@ async def general_exception_handler(request: Request, exc: Exception):
     error_detail = str(exc)
     logger.error(f"Unexpected error: {error_detail} - Path: {request.url.path}")
     logger.error(traceback.format_exc())
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "An internal server error occurred"}
-    )
+    return JSONResponse(status_code=500, content={"detail": "An internal server error occurred"})
 
 
-@app.post("/list_files", response_model=ListFilesResponse, responses={
-    400: {"model": ErrorResponse},
-    403: {"model": ErrorResponse},
-    404: {"model": ErrorResponse},
-    500: {"model": ErrorResponse}
-})
+@app.post(
+    "/list_files",
+    response_model=ListFilesResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
 async def list_files_endpoint(request: ListFilesRequest) -> dict[str, Any]:
     """
     List files in a directory.
-    
+
     Args:
         request: The request containing the directory path
-        
+
     Returns:
         A response with the list of files
     """
     # Variables to be cleaned up in finally block
     files = []
-    
+
     try:
         logger.info(f"Listing files in directory: {request.directory}")
         files = list_files(request.directory, request.use_gitignore)
@@ -116,26 +108,30 @@ async def list_files_endpoint(request: ListFilesRequest) -> dict[str, Any]:
         pass
 
 
-@app.post("/read_file", response_model=ReadFileResponse, responses={
-    400: {"model": ErrorResponse},
-    403: {"model": ErrorResponse},
-    404: {"model": ErrorResponse},
-    500: {"model": ErrorResponse}
-})
+@app.post(
+    "/read_file",
+    response_model=ReadFileResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
 async def read_file_endpoint(request: ReadFileRequest) -> dict[str, Any]:
     """
     Read the contents of a file.
-    
+
     Args:
         request: The request containing the file path
-        
+
     Returns:
         A response with the file content
     """
     # Variables to be cleaned up in finally block
     content = ""
     file_handle = None
-    
+
     try:
         logger.info(f"Reading file: {request.file_path}")
         content = read_file(request.file_path)
@@ -150,24 +146,28 @@ async def read_file_endpoint(request: ReadFileRequest) -> dict[str, Any]:
         pass
 
 
-@app.post("/write_file", response_model=WriteFileResponse, responses={
-    400: {"model": ErrorResponse},
-    403: {"model": ErrorResponse},
-    500: {"model": ErrorResponse}
-})
+@app.post(
+    "/write_file",
+    response_model=WriteFileResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
 async def write_file_endpoint(request: WriteFileRequest) -> dict[str, Any]:
     """
     Write content to a file.
-    
+
     Args:
         request: The request containing the file path and content
-        
+
     Returns:
         A response indicating success
     """
     # Variables to be cleaned up in finally block
     file_handle = None
-    
+
     try:
         logger.info(f"Writing to file: {request.file_path}")
         success = write_file(request.file_path, request.content)
