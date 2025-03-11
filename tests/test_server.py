@@ -1,7 +1,14 @@
 """Tests for the MCP server API endpoints."""
 import os
+import sys
 from pathlib import Path
 from fastapi.testclient import TestClient
+
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Set up the project directory for testing
+os.environ["MCP_PROJECT_DIR"] = os.path.abspath(os.path.dirname(__file__))
 
 from src.server import app
 from src.models import (
@@ -12,7 +19,7 @@ from src.models import (
 client = TestClient(app)
 
 # Test constants
-TEST_DIR = Path("tests/testdata/test_file_tools")
+TEST_DIR = Path("testdata/test_file_tools")
 TEST_FILE = TEST_DIR / "test_api_file.txt"
 TEST_CONTENT = "This is API test content."
 
@@ -39,19 +46,25 @@ def test_write_file_endpoint():
     
     response = client.post("/write_file", json=request.model_dump())
     
+    # Create absolute path for verification
+    abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
+    
     assert response.status_code == 200
     assert response.json() == {"success": True}
-    assert TEST_FILE.exists()
+    assert abs_file_path.exists()
     
-    with open(TEST_FILE, 'r', encoding='utf-8') as f:
+    with open(abs_file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     assert content == TEST_CONTENT
 
 
 def test_read_file_endpoint():
     """Test the read_file endpoint."""
+    # Create absolute path for test file
+    abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
+    
     # Create a test file
-    with open(TEST_FILE, 'w', encoding='utf-8') as f:
+    with open(abs_file_path, 'w', encoding='utf-8') as f:
         f.write(TEST_CONTENT)
     
     request = ReadFileRequest(file_path=str(TEST_FILE))
@@ -64,8 +77,11 @@ def test_read_file_endpoint():
 
 def test_list_files_endpoint():
     """Test the list_files endpoint."""
+    # Create absolute path for test file
+    abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
+    
     # Create a test file
-    with open(TEST_FILE, 'w', encoding='utf-8') as f:
+    with open(abs_file_path, 'w', encoding='utf-8') as f:
         f.write(TEST_CONTENT)
     
     request = ListFilesRequest(directory=str(TEST_DIR))
@@ -113,23 +129,26 @@ def test_list_files_directory_not_found():
 
 def test_list_files_endpoint_with_gitignore():
     """Test the list_files endpoint with gitignore filtering."""
+    # Create absolute paths for test operations
+    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
+    
     # Create a .gitignore file
-    gitignore_path = TEST_DIR / ".gitignore"
+    gitignore_path = abs_test_dir / ".gitignore"
     with open(gitignore_path, 'w', encoding='utf-8') as f:
-        f.write("*.ignore\n")
+        f.write("*.ignore\nignored_dir/\n")
     
     # Create a .git directory that should be ignored
-    git_dir = TEST_DIR / ".git"
+    git_dir = abs_test_dir / ".git"
     git_dir.mkdir(exist_ok=True)
     (git_dir / "HEAD").touch()
     
     # Create a test file that should be ignored
-    test_ignore_file = TEST_DIR / "test.ignore"
+    test_ignore_file = abs_test_dir / "test.ignore"
     with open(test_ignore_file, 'w', encoding='utf-8') as f:
         f.write("This should be ignored")
     
     # Create a test file that should not be ignored
-    test_normal_file = TEST_DIR / "test_normal.txt"
+    test_normal_file = abs_test_dir / "test_normal.txt"
     with open(test_normal_file, 'w', encoding='utf-8') as f:
         f.write("This should not be ignored")
     
@@ -154,23 +173,26 @@ def test_list_files_endpoint_with_gitignore():
 
 def test_list_files_endpoint_without_gitignore():
     """Test the list_files endpoint without gitignore filtering."""
+    # Create absolute paths for test operations
+    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
+    
     # Create a .gitignore file
-    gitignore_path = TEST_DIR / ".gitignore"
+    gitignore_path = abs_test_dir / ".gitignore"
     with open(gitignore_path, 'w', encoding='utf-8') as f:
-        f.write("*.ignore\n")
+        f.write("*.ignore\nignored_dir/\n")
     
     # Create a .git directory that would normally be ignored
-    git_dir = TEST_DIR / ".git"
+    git_dir = abs_test_dir / ".git"
     git_dir.mkdir(exist_ok=True)
     (git_dir / "HEAD").touch()
     
     # Create a test file that would normally be ignored
-    test_ignore_file = TEST_DIR / "test.ignore"
+    test_ignore_file = abs_test_dir / "test.ignore"
     with open(test_ignore_file, 'w', encoding='utf-8') as f:
         f.write("This would normally be ignored")
     
     # Create a test file that would not be ignored
-    test_normal_file = TEST_DIR / "test_normal.txt"
+    test_normal_file = abs_test_dir / "test_normal.txt"
     with open(test_normal_file, 'w', encoding='utf-8') as f:
         f.write("This would not be ignored")
     

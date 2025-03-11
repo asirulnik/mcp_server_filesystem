@@ -1,12 +1,19 @@
 """Tests for file_tools module."""
 import os
+import sys
 import pytest
 from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Set up the project directory for testing
+os.environ["MCP_PROJECT_DIR"] = os.path.abspath(os.path.dirname(__file__))
 
 from src.file_tools import list_files, read_file, write_file
 
 # Test constants
-TEST_DIR = Path("tests/testdata/test_file_tools")
+TEST_DIR = Path("testdata/test_file_tools")
 TEST_FILE = TEST_DIR / "test_file.txt"
 TEST_CONTENT = "This is test content."
 
@@ -15,6 +22,9 @@ def setup_function():
     """Setup for each test function."""
     # Ensure the test directory exists
     TEST_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Make absolute path for test operations
+    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
 
 
 def teardown_function():
@@ -29,20 +39,26 @@ def test_write_file():
     # Test writing to a file
     result = write_file(str(TEST_FILE), TEST_CONTENT)
     
+    # Create path for verification
+    abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
+    
     # Verify the file was written
     assert result is True
-    assert TEST_FILE.exists()
+    assert abs_file_path.exists()
     
     # Verify the file content
-    with open(TEST_FILE, 'r', encoding='utf-8') as f:
+    with open(abs_file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     assert content == TEST_CONTENT
 
 
 def test_read_file():
     """Test reading from a file."""
+    # Create an absolute path for test file creation
+    abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
+    
     # Create a test file
-    with open(TEST_FILE, 'w', encoding='utf-8') as f:
+    with open(abs_file_path, 'w', encoding='utf-8') as f:
         f.write(TEST_CONTENT)
     
     # Test reading the file
@@ -67,8 +83,12 @@ def test_read_file_not_found():
 
 def test_list_files():
     """Test listing files in a directory."""
+    # Create absolute paths for test operations
+    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
+    abs_test_file = abs_test_dir / TEST_FILE.name
+    
     # Create a test file
-    with open(TEST_FILE, 'w', encoding='utf-8') as f:
+    with open(abs_test_file, 'w', encoding='utf-8') as f:
         f.write(TEST_CONTENT)
     
     # Test listing files
@@ -80,24 +100,30 @@ def test_list_files():
 
 def test_list_files_with_gitignore():
     """Test listing files with gitignore filtering."""
-    # Create a test directory with files
-    test_dir = TEST_DIR
-    test_dir.mkdir(parents=True, exist_ok=True)
+    # Create absolute paths for test operations
+    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
+    
+    # Ensure test directory exists
+    abs_test_dir.mkdir(parents=True, exist_ok=True)
     
     # Create a .git directory that should be ignored
-    git_dir = test_dir / ".git"
+    git_dir = abs_test_dir / ".git"
     git_dir.mkdir(exist_ok=True)
     (git_dir / "HEAD").touch()
     
     # Create some test files
-    (test_dir / "normal.txt").touch()
-    (test_dir / "test.ignore").touch()
-    ignored_dir = test_dir / "ignored_dir"
+    (abs_test_dir / "normal.txt").touch()
+    (abs_test_dir / "test.ignore").touch()
+    ignored_dir = abs_test_dir / "ignored_dir"
     ignored_dir.mkdir(exist_ok=True)
     (ignored_dir / "ignored_file.txt").touch()
     
+    # Create a gitignore file
+    with open(abs_test_dir / ".gitignore", 'w', encoding='utf-8') as f:
+        f.write("*.ignore\nignored_dir/\n")
+    
     # Test listing files with gitignore filtering
-    files = list_files(str(test_dir))
+    files = list_files(str(TEST_DIR))
     
     # The .gitignore should exclude *.ignore files, the ignored_dir/, and .git/
     assert "normal.txt" in files
@@ -107,34 +133,41 @@ def test_list_files_with_gitignore():
     assert ".git" not in files
     
     # Clean up
-    (test_dir / "normal.txt").unlink()
-    (test_dir / "test.ignore").unlink()
+    (abs_test_dir / "normal.txt").unlink()
+    (abs_test_dir / "test.ignore").unlink()
     (ignored_dir / "ignored_file.txt").unlink()
     ignored_dir.rmdir()
     (git_dir / "HEAD").unlink()
     git_dir.rmdir()
+    (abs_test_dir / ".gitignore").unlink()
 
 
 def test_list_files_without_gitignore():
     """Test listing files without gitignore filtering."""
-    # Create a test directory with files
-    test_dir = TEST_DIR
-    test_dir.mkdir(parents=True, exist_ok=True)
+    # Create absolute paths for test operations
+    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
+    
+    # Ensure test directory exists
+    abs_test_dir.mkdir(parents=True, exist_ok=True)
     
     # Create a .git directory that should be included when gitignore is disabled
-    git_dir = test_dir / ".git"
+    git_dir = abs_test_dir / ".git"
     git_dir.mkdir(exist_ok=True)
     (git_dir / "HEAD").touch()
     
     # Create some test files
-    (test_dir / "normal.txt").touch()
-    (test_dir / "test.ignore").touch()
-    ignored_dir = test_dir / "ignored_dir"
+    (abs_test_dir / "normal.txt").touch()
+    (abs_test_dir / "test.ignore").touch()
+    ignored_dir = abs_test_dir / "ignored_dir"
     ignored_dir.mkdir(exist_ok=True)
     (ignored_dir / "ignored_file.txt").touch()
     
+    # Create a gitignore file
+    with open(abs_test_dir / ".gitignore", 'w', encoding='utf-8') as f:
+        f.write("*.ignore\nignored_dir/\n")
+    
     # Test listing files without gitignore filtering
-    files = list_files(str(test_dir), use_gitignore=False)
+    files = list_files(str(TEST_DIR), use_gitignore=False)
     
     # When gitignore is disabled, all files should be included
     assert "normal.txt" in files
@@ -144,12 +177,13 @@ def test_list_files_without_gitignore():
     assert ".git" in files
     
     # Clean up
-    (test_dir / "normal.txt").unlink()
-    (test_dir / "test.ignore").unlink()
+    (abs_test_dir / "normal.txt").unlink()
+    (abs_test_dir / "test.ignore").unlink()
     (ignored_dir / "ignored_file.txt").unlink()
     ignored_dir.rmdir()
     (git_dir / "HEAD").unlink()
     git_dir.rmdir()
+    (abs_test_dir / ".gitignore").unlink()
 
 
 def test_list_files_directory_not_found():

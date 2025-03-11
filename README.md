@@ -1,6 +1,6 @@
 # MCP File Tools Server
 
-A simple Model Context Protocol (MCP) server with file operation tools. This server provides a straightforward API for performing file system operations, following the MCP protocol design.
+A simple Model Context Protocol (MCP) server with file operation tools. This server provides a straightforward API for performing file system operations within a specified project directory, following the MCP protocol design.
 
 ## Features
 
@@ -32,14 +32,16 @@ python -m src.main
 By default, the server will run on `http://127.0.0.1:8000`. You can change the host and port using command line arguments:
 
 ```bash
-python -m src.main --host 0.0.0.0 --port 8080
+python -m src.main --host 0.0.0.0 --port 8080 --project-dir /path/to/project
 ```
 
-You can also specify a base directory for file operations (optional):
+You can also specify a project directory for file operations (**required**):
 
 ```bash
-python -m src.main --base-dir /path/to/base/directory
+python -m src.main --project-dir /path/to/project
 ```
+
+All file operations will be restricted to this directory for security. Attempts to access files outside this directory will result in an error.
 
 ## API Endpoints
 
