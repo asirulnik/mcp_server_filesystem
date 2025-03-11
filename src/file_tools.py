@@ -104,57 +104,71 @@ def list_files(directory: str, use_gitignore: bool = True) -> list[str]:
     abs_path, rel_path = normalize_path(directory)
     
     if not abs_path.exists():
+        logger.error(f"Directory not found: {directory}")
         raise FileNotFoundError(f"Directory '{directory}' does not exist")
     
     if not abs_path.is_dir():
+        logger.error(f"Path is not a directory: {directory}")
         raise NotADirectoryError(f"Path '{directory}' is not a directory")
     
-    # Get all files in the directory
-    all_files = [str(f.name) for f in abs_path.iterdir()]
-    
-    # If gitignore filtering is not requested, return all files
-    if not use_gitignore:
-        return all_files
-    
-    # Check if a .gitignore file exists in the directory
-    gitignore_path = abs_path / ".gitignore"
-    if not gitignore_path.exists() or not gitignore_path.is_file():
-        # No .gitignore file found, return all files
-        return all_files
-    
     try:
-        # Read and parse .gitignore file
-        with open(gitignore_path, "r", encoding="utf-8") as f:
-            gitignore_patterns = f.read().splitlines()
-            
-        # Always ignore .git directory if .gitignore exists
-        if not any(pattern.strip() == ".git/" or pattern.strip() == ".git" for pattern in gitignore_patterns):
-            gitignore_patterns.append(".git/")
+        # Get all files in the directory
+        logger.debug(f"Listing files in directory: {rel_path}")
+        all_files = [str(f.name) for f in abs_path.iterdir()]
+        logger.debug(f"Found {len(all_files)} unfiltered files in {rel_path}")
         
-        # Create PathSpec object for pattern matching
-        spec = PathSpec.from_lines(GitWildMatchPattern, gitignore_patterns)
+        # If gitignore filtering is not requested, return all files
+        if not use_gitignore:
+            logger.debug(f"Gitignore filtering disabled, returning all files")
+            return all_files
         
-        # Filter files based on gitignore patterns
-        filtered_files = []
-        for item in all_files:
-            # Check both the file name and the directory-style name with trailing slash
-            # This ensures directories are properly matched by gitignore patterns
-            if not spec.match_file(item) and not spec.match_file(f"{item}/"):
-                # If it's a directory, make extra sure it's not excluded
-                if (abs_path / item).is_dir():
-                    # Additional check specifically for directories
-                    if not any(pattern.endswith('/') and pattern.rstrip('/') == item for pattern in gitignore_patterns):
-                        filtered_files.append(item)
-                else:
-                    # Regular file
-                    filtered_files.append(item)
-        
-        return filtered_files
+        # Check if a .gitignore file exists in the directory
+        gitignore_path = abs_path / ".gitignore"
+        if not gitignore_path.exists() or not gitignore_path.is_file():
+            # No .gitignore file found, return all files
+            logger.debug(f"No .gitignore file found in {rel_path}, returning all files")
+            return all_files
     
+        try:
+            # Read and parse .gitignore file
+            logger.debug(f"Reading .gitignore file from {rel_path}")
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                gitignore_patterns = f.read().splitlines()
+                
+            # Always ignore .git directory if .gitignore exists
+            if not any(pattern.strip() == ".git/" or pattern.strip() == ".git" for pattern in gitignore_patterns):
+                logger.debug(f"Adding .git/ to gitignore patterns")
+                gitignore_patterns.append(".git/")
+            
+            # Create PathSpec object for pattern matching
+            logger.debug(f"Creating gitignore PathSpec with {len(gitignore_patterns)} patterns")
+            spec = PathSpec.from_lines(GitWildMatchPattern, gitignore_patterns)
+            
+            # Filter files based on gitignore patterns
+            filtered_files = []
+            for item in all_files:
+                # Check both the file name and the directory-style name with trailing slash
+                # This ensures directories are properly matched by gitignore patterns
+                if not spec.match_file(item) and not spec.match_file(f"{item}/"):
+                    # If it's a directory, make extra sure it's not excluded
+                    if (abs_path / item).is_dir():
+                        # Additional check specifically for directories
+                        if not any(pattern.endswith('/') and pattern.rstrip('/') == item for pattern in gitignore_patterns):
+                            filtered_files.append(item)
+                    else:
+                        # Regular file
+                        filtered_files.append(item)
+            
+            logger.debug(f"Filtered {len(all_files)} files down to {len(filtered_files)} files")
+            return filtered_files
+        
+        except Exception as e:
+            # If there's an error parsing .gitignore, log it and return all files
+            logger.warning(f"Error applying gitignore filter: {str(e)}. Returning all files.")
+            return all_files
     except Exception as e:
-        # If there's an error parsing .gitignore, log it and return all files
-        logger.warning(f"Error applying gitignore filter: {str(e)}. Returning all files.")
-        return all_files
+        logger.error(f"Error listing files in directory {rel_path}: {str(e)}")
+        raise
 
 
 def read_file(file_path: str) -> str:
@@ -176,13 +190,29 @@ def read_file(file_path: str) -> str:
     abs_path, rel_path = normalize_path(file_path)
     
     if not abs_path.exists():
+        logger.error(f"File not found: {file_path}")
         raise FileNotFoundError(f"File '{file_path}' does not exist")
     
     if not abs_path.is_file():
+        logger.error(f"Path is not a file: {file_path}")
         raise IsADirectoryError(f"Path '{file_path}' is not a file")
     
-    with open(abs_path, 'r', encoding='utf-8') as file:
-        return file.read()
+    file_handle = None
+    try:
+        logger.debug(f"Reading file: {rel_path}")
+        file_handle = open(abs_path, 'r', encoding='utf-8')
+        content = file_handle.read()
+        logger.debug(f"Successfully read {len(content)} bytes from {rel_path}")
+        return content
+    except UnicodeDecodeError as e:
+        logger.error(f"Unicode decode error while reading {rel_path}: {str(e)}")
+        raise ValueError(f"File '{file_path}' contains invalid characters. Ensure it's a valid text file.") from e
+    except Exception as e:
+        logger.error(f"Error reading file {rel_path}: {str(e)}")
+        raise
+    finally:
+        if file_handle is not None:
+            file_handle.close()
 
 
 def write_file(file_path: str, content: str) -> bool:
@@ -204,10 +234,30 @@ def write_file(file_path: str, content: str) -> bool:
     abs_path, rel_path = normalize_path(file_path)
     
     # Create directory if it doesn't exist
-    if not abs_path.parent.exists():
-        abs_path.parent.mkdir(parents=True)
+    try:
+        if not abs_path.parent.exists():
+            logger.info(f"Creating directory: {abs_path.parent}")
+            abs_path.parent.mkdir(parents=True)
+    except PermissionError as e:
+        logger.error(f"Permission denied creating directory {abs_path.parent}: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Error creating directory {abs_path.parent}: {str(e)}")
+        raise
     
-    with open(abs_path, 'w', encoding='utf-8') as file:
-        file.write(content)
-    
-    return True
+    file_handle = None
+    try:
+        logger.debug(f"Writing to file: {rel_path}")
+        file_handle = open(abs_path, 'w', encoding='utf-8')
+        file_handle.write(content)
+        logger.debug(f"Successfully wrote {len(content)} bytes to {rel_path}")
+        return True
+    except UnicodeEncodeError as e:
+        logger.error(f"Unicode encode error while writing to {rel_path}: {str(e)}")
+        raise ValueError(f"Content contains characters that cannot be encoded. Please check the encoding.") from e
+    except Exception as e:
+        logger.error(f"Error writing to file {rel_path}: {str(e)}")
+        raise
+    finally:
+        if file_handle is not None:
+            file_handle.close()

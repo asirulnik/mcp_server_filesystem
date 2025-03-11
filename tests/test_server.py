@@ -105,8 +105,9 @@ def test_read_file_not_found():
     
     response = client.post("/read_file", json=request.model_dump())
     
-    assert response.status_code == 400
+    assert response.status_code == 404
     response_data = response.json()
+    # Check that response includes the error type
     assert "FileNotFoundError" in response_data["detail"]
 
 
@@ -122,7 +123,7 @@ def test_list_files_directory_not_found():
     
     response = client.post("/list_files", json=request.model_dump())
     
-    assert response.status_code == 400
+    assert response.status_code == 404
     response_data = response.json()
     assert "FileNotFoundError" in response_data["detail"]
 
