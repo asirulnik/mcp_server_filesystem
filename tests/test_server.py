@@ -118,6 +118,11 @@ def test_list_files_endpoint_with_gitignore():
     with open(gitignore_path, 'w', encoding='utf-8') as f:
         f.write("*.ignore\n")
     
+    # Create a .git directory that should be ignored
+    git_dir = TEST_DIR / ".git"
+    git_dir.mkdir(exist_ok=True)
+    (git_dir / "HEAD").touch()
+    
     # Create a test file that should be ignored
     test_ignore_file = TEST_DIR / "test.ignore"
     with open(test_ignore_file, 'w', encoding='utf-8') as f:
@@ -137,11 +142,14 @@ def test_list_files_endpoint_with_gitignore():
     assert "test_normal.txt" in files
     assert ".gitignore" in files
     assert "test.ignore" not in files
+    assert ".git" not in files
     
     # Clean up
     gitignore_path.unlink()
     test_ignore_file.unlink()
     test_normal_file.unlink()
+    (git_dir / "HEAD").unlink()
+    git_dir.rmdir()
 
 
 def test_list_files_endpoint_without_gitignore():
@@ -150,6 +158,11 @@ def test_list_files_endpoint_without_gitignore():
     gitignore_path = TEST_DIR / ".gitignore"
     with open(gitignore_path, 'w', encoding='utf-8') as f:
         f.write("*.ignore\n")
+    
+    # Create a .git directory that would normally be ignored
+    git_dir = TEST_DIR / ".git"
+    git_dir.mkdir(exist_ok=True)
+    (git_dir / "HEAD").touch()
     
     # Create a test file that would normally be ignored
     test_ignore_file = TEST_DIR / "test.ignore"
@@ -170,8 +183,11 @@ def test_list_files_endpoint_without_gitignore():
     assert "test_normal.txt" in files
     assert ".gitignore" in files
     assert "test.ignore" in files
+    assert ".git" in files
     
     # Clean up
     gitignore_path.unlink()
     test_ignore_file.unlink()
     test_normal_file.unlink()
+    (git_dir / "HEAD").unlink()
+    git_dir.rmdir()

@@ -33,7 +33,7 @@ mcp_server_filesystem/
 
 Contains core file system operation functions:
 
-- `list_files`: Lists all files in a directory with optional .gitignore filtering
+- `list_files`: Lists all files in a directory with optional .gitignore filtering and .git folder exclusion
 - `read_file`: Reads content from a file
 - `write_file`: Writes content to a file
 

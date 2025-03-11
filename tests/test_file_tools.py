@@ -84,6 +84,11 @@ def test_list_files_with_gitignore():
     test_dir = TEST_DIR
     test_dir.mkdir(parents=True, exist_ok=True)
     
+    # Create a .git directory that should be ignored
+    git_dir = test_dir / ".git"
+    git_dir.mkdir(exist_ok=True)
+    (git_dir / "HEAD").touch()
+    
     # Create some test files
     (test_dir / "normal.txt").touch()
     (test_dir / "test.ignore").touch()
@@ -94,17 +99,20 @@ def test_list_files_with_gitignore():
     # Test listing files with gitignore filtering
     files = list_files(str(test_dir))
     
-    # The .gitignore should exclude *.ignore files and the ignored_dir/
+    # The .gitignore should exclude *.ignore files, the ignored_dir/, and .git/
     assert "normal.txt" in files
     assert ".gitignore" in files
     assert "test.ignore" not in files
     assert "ignored_dir" not in files
+    assert ".git" not in files
     
     # Clean up
     (test_dir / "normal.txt").unlink()
     (test_dir / "test.ignore").unlink()
     (ignored_dir / "ignored_file.txt").unlink()
     ignored_dir.rmdir()
+    (git_dir / "HEAD").unlink()
+    git_dir.rmdir()
 
 
 def test_list_files_without_gitignore():
@@ -112,6 +120,11 @@ def test_list_files_without_gitignore():
     # Create a test directory with files
     test_dir = TEST_DIR
     test_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create a .git directory that should be included when gitignore is disabled
+    git_dir = test_dir / ".git"
+    git_dir.mkdir(exist_ok=True)
+    (git_dir / "HEAD").touch()
     
     # Create some test files
     (test_dir / "normal.txt").touch()
@@ -128,12 +141,15 @@ def test_list_files_without_gitignore():
     assert ".gitignore" in files
     assert "test.ignore" in files
     assert "ignored_dir" in files
+    assert ".git" in files
     
     # Clean up
     (test_dir / "normal.txt").unlink()
     (test_dir / "test.ignore").unlink()
     (ignored_dir / "ignored_file.txt").unlink()
     ignored_dir.rmdir()
+    (git_dir / "HEAD").unlink()
+    git_dir.rmdir()
 
 
 def test_list_files_directory_not_found():

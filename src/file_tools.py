@@ -46,6 +46,10 @@ def list_files(directory: str, use_gitignore: bool = True) -> list[str]:
         # Read and parse .gitignore file
         with open(gitignore_path, "r", encoding="utf-8") as f:
             gitignore_patterns = f.read().splitlines()
+            
+        # Always ignore .git directory if .gitignore exists
+        if not any(pattern.strip() == ".git/" or pattern.strip() == ".git" for pattern in gitignore_patterns):
+            gitignore_patterns.append(".git/")
         
         # Create PathSpec object for pattern matching
         spec = PathSpec.from_lines(GitWildMatchPattern, gitignore_patterns)

@@ -4,7 +4,7 @@ A simple Model Context Protocol (MCP) server with file operation tools. This ser
 
 ## Features
 
-- `list_files`: List all files in a directory (with optional .gitignore filtering)
+- `list_files`: List all files in a directory (with optional .gitignore filtering and .git folder exclusion)
 - `read_file`: Read the contents of a file
 - `write_file`: Write content to a file
 
