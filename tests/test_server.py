@@ -1,22 +1,20 @@
 """Tests for the MCP server API endpoints."""
+
 import os
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
-from fastapi.testclient import TestClient
+import pytest
 
-from src.models import ListFilesRequest, ReadFileRequest, WriteFileRequest
-from src.server import app
+from src.server import list_directory, read_file, write_file
 
 # Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Set up the project directory for testing
 os.environ["MCP_PROJECT_DIR"] = os.path.abspath(os.path.dirname(__file__))
 
-
-# Create a test client
-client = TestClient(app)
 
 # Test constants
 TEST_DIR = Path("testdata/test_file_tools")
@@ -37,180 +35,108 @@ def teardown_function():
         TEST_FILE.unlink()
 
 
-def test_write_file_endpoint():
-    """Test the write_file endpoint."""
-    request = WriteFileRequest(
-        file_path=str(TEST_FILE),
-        content=TEST_CONTENT
-    )
-    
-    response = client.post("/write_file", json=request.model_dump())
-    
+@pytest.mark.asyncio
+async def test_write_file():
+    """Test the write_file tool."""
+    result = await write_file(str(TEST_FILE), TEST_CONTENT)
+
     # Create absolute path for verification
     abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
-    
-    assert response.status_code == 200
-    assert response.json() == {"success": True}
+
+    assert result is True
     assert abs_file_path.exists()
-    
-    with open(abs_file_path, 'r', encoding='utf-8') as f:
+
+    with open(abs_file_path, "r", encoding="utf-8") as f:
         content = f.read()
     assert content == TEST_CONTENT
 
 
-def test_read_file_endpoint():
-    """Test the read_file endpoint."""
+@pytest.mark.asyncio
+async def test_read_file():
+    """Test the read_file tool."""
     # Create absolute path for test file
     abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
-    
+
     # Create a test file
-    with open(abs_file_path, 'w', encoding='utf-8') as f:
+    with open(abs_file_path, "w", encoding="utf-8") as f:
         f.write(TEST_CONTENT)
-    
-    request = ReadFileRequest(file_path=str(TEST_FILE))
-    
-    response = client.post("/read_file", json=request.model_dump())
-    
-    assert response.status_code == 200
-    assert response.json() == {"content": TEST_CONTENT}
+
+    content = await read_file(str(TEST_FILE))
+
+    assert content == TEST_CONTENT
 
 
-def test_list_files_endpoint():
-    """Test the list_files endpoint."""
+@pytest.mark.asyncio
+@patch("src.server.list_files_util")
+async def test_list_directory(mock_list_files):
+    """Test the list_directory tool."""
     # Create absolute path for test file
     abs_file_path = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_FILE
-    
+
     # Create a test file
-    with open(abs_file_path, 'w', encoding='utf-8') as f:
+    with open(abs_file_path, "w", encoding="utf-8") as f:
         f.write(TEST_CONTENT)
-    
-    request = ListFilesRequest(directory=str(TEST_DIR))
-    
-    response = client.post("/list_files", json=request.model_dump())
-    
-    assert response.status_code == 200
-    files = response.json()["files"]
-    assert TEST_FILE.name in files
+
+    # Mock the list_files function to return our test file
+    mock_list_files.return_value = [str(TEST_FILE)]
+
+    files = await list_directory()
+
+    # Verify the function was called with correct parameters
+    mock_list_files.assert_called_once_with(".", use_gitignore=True)
+
+    assert str(TEST_FILE) in files
 
 
-def test_read_file_not_found():
-    """Test the read_file endpoint with a non-existent file."""
+@pytest.mark.asyncio
+async def test_read_file_not_found():
+    """Test the read_file tool with a non-existent file."""
     non_existent_file = TEST_DIR / "non_existent.txt"
-    
+
     # Ensure the file doesn't exist
     if non_existent_file.exists():
         non_existent_file.unlink()
-    
-    request = ReadFileRequest(file_path=str(non_existent_file))
-    
-    response = client.post("/read_file", json=request.model_dump())
-    
-    assert response.status_code == 404
-    response_data = response.json()
-    # Check that response includes the error type
-    assert "FileNotFoundError" in response_data["detail"]
+
+    with pytest.raises(FileNotFoundError):
+        await read_file(str(non_existent_file))
 
 
-def test_list_files_directory_not_found():
-    """Test the list_files endpoint with a non-existent directory."""
-    non_existent_dir = TEST_DIR / "non_existent_dir"
-    
-    # Ensure the directory doesn't exist
-    if non_existent_dir.exists() and non_existent_dir.is_dir():
-        non_existent_dir.rmdir()
-    
-    request = ListFilesRequest(directory=str(non_existent_dir))
-    
-    response = client.post("/list_files", json=request.model_dump())
-    
-    assert response.status_code == 404
-    response_data = response.json()
-    assert "FileNotFoundError" in response_data["detail"]
+@pytest.mark.asyncio
+@patch("src.server.list_files_util")
+async def test_list_directory_directory_not_found(mock_list_files):
+    """Test the list_directory tool with a non-existent directory."""
+    # Mock list_files to raise FileNotFoundError
+    mock_list_files.side_effect = FileNotFoundError("Directory not found")
+
+    with pytest.raises(FileNotFoundError):
+        await list_directory()
 
 
-def test_list_files_endpoint_with_gitignore():
-    """Test the list_files endpoint with gitignore filtering."""
-    # Create absolute paths for test operations
-    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
-    
-    # Create a .gitignore file
-    gitignore_path = abs_test_dir / ".gitignore"
-    with open(gitignore_path, 'w', encoding='utf-8') as f:
-        f.write("*.ignore\nignored_dir/\n")
-    
-    # Create a .git directory that should be ignored
-    git_dir = abs_test_dir / ".git"
-    git_dir.mkdir(exist_ok=True)
-    (git_dir / "HEAD").touch()
-    
-    # Create a test file that should be ignored
-    test_ignore_file = abs_test_dir / "test.ignore"
-    with open(test_ignore_file, 'w', encoding='utf-8') as f:
-        f.write("This should be ignored")
-    
-    # Create a test file that should not be ignored
-    test_normal_file = abs_test_dir / "test_normal.txt"
-    with open(test_normal_file, 'w', encoding='utf-8') as f:
-        f.write("This should not be ignored")
-    
-    # Test with gitignore filtering enabled (default)
-    request = ListFilesRequest(directory=str(TEST_DIR))
-    response = client.post("/list_files", json=request.model_dump())
-    
-    assert response.status_code == 200
-    files = response.json()["files"]
-    assert "test_normal.txt" in files
-    assert ".gitignore" in files
-    assert "test.ignore" not in files
-    assert ".git" not in files
-    
-    # Clean up
-    gitignore_path.unlink()
-    test_ignore_file.unlink()
-    test_normal_file.unlink()
-    (git_dir / "HEAD").unlink()
-    git_dir.rmdir()
+@pytest.mark.asyncio
+@patch("src.server.list_files_util")
+async def test_list_directory_with_gitignore(mock_list_files):
+    """Test the list_directory tool with gitignore filtering."""
+    # Mock list_files to return filtered files
+    mock_list_files.return_value = [
+        str(TEST_DIR / "test_normal.txt"),
+        str(TEST_DIR / ".gitignore"),
+    ]
+
+    files = await list_directory()
+
+    # Verify the function was called with gitignore=True
+    mock_list_files.assert_called_once_with(".", use_gitignore=True)
+
+    assert str(TEST_DIR / "test_normal.txt") in files
+    assert str(TEST_DIR / ".gitignore") in files
 
 
-def test_list_files_endpoint_without_gitignore():
-    """Test the list_files endpoint without gitignore filtering."""
-    # Create absolute paths for test operations
-    abs_test_dir = Path(os.environ["MCP_PROJECT_DIR"]) / TEST_DIR
-    
-    # Create a .gitignore file
-    gitignore_path = abs_test_dir / ".gitignore"
-    with open(gitignore_path, 'w', encoding='utf-8') as f:
-        f.write("*.ignore\nignored_dir/\n")
-    
-    # Create a .git directory that would normally be ignored
-    git_dir = abs_test_dir / ".git"
-    git_dir.mkdir(exist_ok=True)
-    (git_dir / "HEAD").touch()
-    
-    # Create a test file that would normally be ignored
-    test_ignore_file = abs_test_dir / "test.ignore"
-    with open(test_ignore_file, 'w', encoding='utf-8') as f:
-        f.write("This would normally be ignored")
-    
-    # Create a test file that would not be ignored
-    test_normal_file = abs_test_dir / "test_normal.txt"
-    with open(test_normal_file, 'w', encoding='utf-8') as f:
-        f.write("This would not be ignored")
-    
-    # Test with gitignore filtering disabled
-    request = ListFilesRequest(directory=str(TEST_DIR), use_gitignore=False)
-    response = client.post("/list_files", json=request.model_dump())
-    
-    assert response.status_code == 200
-    files = response.json()["files"]
-    assert "test_normal.txt" in files
-    assert ".gitignore" in files
-    assert "test.ignore" in files
-    assert ".git" in files
-    
-    # Clean up
-    gitignore_path.unlink()
-    test_ignore_file.unlink()
-    test_normal_file.unlink()
-    (git_dir / "HEAD").unlink()
-    git_dir.rmdir()
+@pytest.mark.asyncio
+@patch("src.server.list_files_util")
+async def test_list_directory_error_handling(mock_list_files):
+    """Test error handling in the list_directory tool."""
+    # Mock list_files to raise an exception
+    mock_list_files.side_effect = Exception("Test error")
+
+    with pytest.raises(Exception):
+        await list_directory()

@@ -1,23 +1,15 @@
-"""MCP server implementation with file operation tools."""
-
 import logging
-import traceback
-from typing import Any
+import os
+from pathlib import Path
+from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from mcp.server.fastmcp import FastMCP
 
-from src.file_tools import list_files, read_file, write_file
-from src.models import (
-    ErrorResponse,
-    ListFilesRequest,
-    ListFilesResponse,
-    ReadFileRequest,
-    ReadFileResponse,
-    WriteFileRequest,
-    WriteFileResponse,
-)
+# Import utility functions from file_tools
+from src.file_tools import list_files as list_files_util
+from src.file_tools import normalize_path
+from src.file_tools import read_file as read_file_util
+from src.file_tools import write_file as write_file_util
 
 # Configure logging
 logging.basicConfig(
@@ -25,158 +17,84 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
-app = FastAPI(
-    title="MCP File Tools Server",
-    description="A simple Model Context Protocol server with file operation tools",
-    version="0.1.0",
-)
+# Create a FastMCP server instance
+mcp = FastMCP("File System Service")
 
 
-# Global exception handlers
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle validation errors in API requests."""
-    error_detail = f"Validation error: {str(exc)}"
-    logger.warning(f"{error_detail} - Path: {request.url.path}")
-    return JSONResponse(status_code=400, content={"detail": error_detail})
-
-
-@app.exception_handler(ValueError)
-async def value_error_handler(request: Request, exc: ValueError):
-    """Handle security and validation errors."""
-    error_detail = str(exc)
-    if "Security error:" in error_detail:
-        logger.warning(f"Security violation: {error_detail} - Path: {request.url.path}")
-        return JSONResponse(status_code=403, content={"detail": error_detail})
-    else:
-        logger.warning(f"Validation error: {error_detail} - Path: {request.url.path}")
-        return JSONResponse(status_code=400, content={"detail": error_detail})
-
-
-@app.exception_handler(FileNotFoundError)
-async def file_not_found_handler(request: Request, exc: FileNotFoundError):
-    """Handle file not found errors."""
-    error_detail = f"FileNotFoundError: {str(exc)}"
-    logger.info(f"File not found: {str(exc)} - Path: {request.url.path}")
-    return JSONResponse(status_code=404, content={"detail": error_detail})
-
-
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    """Handle unexpected errors."""
-    error_detail = str(exc)
-    logger.error(f"Unexpected error: {error_detail} - Path: {request.url.path}")
-    logger.error(traceback.format_exc())
-    return JSONResponse(status_code=500, content={"detail": "An internal server error occurred"})
-
-
-@app.post(
-    "/list_files",
-    response_model=ListFilesResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        403: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-)
-async def list_files_endpoint(request: ListFilesRequest) -> dict[str, Any]:
+def get_project_dir() -> Path:
     """
-    List files in a directory.
-
-    Args:
-        request: The request containing the directory path
+    Get the absolute path to the project directory.
 
     Returns:
-        A response with the list of files
+        Path object of the project directory
+
+    Raises:
+        RuntimeError: If MCP_PROJECT_DIR environment variable is not set
     """
-    # Variables to be cleaned up in finally block
-    files = []
-
-    try:
-        logger.info(f"Listing files in directory: {request.directory}")
-        files = list_files(request.directory, request.use_gitignore)
-        logger.debug(f"Found {len(files)} files in {request.directory}")
-        return {"files": files}
-    except Exception as e:
-        # Let the global exception handlers deal with it
-        logger.error(f"Error in list_files_endpoint: {str(e)}")
-        raise
-    finally:
-        # Cleanup resources if needed (nothing to clean up here)
-        pass
+    project_dir = os.environ.get("MCP_PROJECT_DIR")
+    if not project_dir:
+        raise RuntimeError(
+            "Project directory not set. Make sure to set the MCP_PROJECT_DIR environment variable."
+        )
+    return Path(project_dir)
 
 
-@app.post(
-    "/read_file",
-    response_model=ReadFileResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        403: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-)
-async def read_file_endpoint(request: ReadFileRequest) -> dict[str, Any]:
-    """
-    Read the contents of a file.
-
-    Args:
-        request: The request containing the file path
+@mcp.tool()
+async def list_directory() -> List[str]:
+    """List files and directories in the project directory.
 
     Returns:
-        A response with the file content
+        A list of filenames in the project directory
     """
-    # Variables to be cleaned up in finally block
-    content = ""
-    file_handle = None
-
     try:
-        logger.info(f"Reading file: {request.file_path}")
-        content = read_file(request.file_path)
-        logger.debug(f"Successfully read {len(content)} bytes from {request.file_path}")
-        return {"content": content}
+        project_dir = get_project_dir()
+        logger.info(f"Listing all files in project directory: {project_dir}")
+        result = list_files_util(".", use_gitignore=True)
+        return result
     except Exception as e:
-        # Let the global exception handlers deal with it
-        logger.error(f"Error in read_file_endpoint: {str(e)}")
+        logger.error(f"Error listing project directory: {str(e)}")
         raise
-    finally:
-        # Cleanup resources if needed (file is already closed in read_file function)
-        pass
 
 
-@app.post(
-    "/write_file",
-    response_model=WriteFileResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        403: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-)
-async def write_file_endpoint(request: WriteFileRequest) -> dict[str, Any]:
-    """
-    Write content to a file.
+@mcp.tool()
+async def read_file(file_path: str) -> str:
+    """Read the contents of a file.
 
     Args:
-        request: The request containing the file path and content
+        file_path: Path to the file to read (relative to project directory)
 
     Returns:
-        A response indicating success
+        The contents of the file as a string
     """
-    # Variables to be cleaned up in finally block
-    file_handle = None
-
+    logger.info(f"Reading file: {file_path}")
     try:
-        logger.info(f"Writing to file: {request.file_path}")
-        success = write_file(request.file_path, request.content)
-        logger.debug(f"Successfully wrote {len(request.content)} bytes to {request.file_path}")
-        return {"success": success}
+        content = read_file_util(file_path)
+        return content
     except Exception as e:
-        # Let the global exception handlers deal with it
-        logger.error(f"Error in write_file_endpoint: {str(e)}")
+        logger.error(f"Error reading file: {str(e)}")
         raise
-    finally:
-        # Cleanup resources if needed (file is already closed in write_file function)
-        pass
+
+
+@mcp.tool()
+async def write_file(file_path: str, content: str) -> bool:
+    """Write content to a file.
+
+    Args:
+        file_path: Path to the file to write to (relative to project directory)
+        content: Content to write to the file
+
+    Returns:
+        True if the file was written successfully
+    """
+    logger.info(f"Writing to file: {file_path}")
+    try:
+        success = write_file_util(file_path, content)
+        return success
+    except Exception as e:
+        logger.error(f"Error writing to file: {str(e)}")
+        raise
+
+
+# Run the server when the script is executed directly
+if __name__ == "__main__":
+    mcp.run()
