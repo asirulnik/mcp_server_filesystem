@@ -22,7 +22,6 @@ def get_project_dir() -> Path:
     Raises:
         RuntimeError: If MCP_PROJECT_DIR environment variable is not set
     """
-    return ""
     project_dir = os.environ.get("MCP_PROJECT_DIR")
     if not project_dir:
         raise RuntimeError(
