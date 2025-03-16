@@ -1,15 +1,15 @@
 import logging
-import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from mcp.server.fastmcp import FastMCP
 
-# Import utility functions from file_tools
+# Import utility functions from the main package
+from src.file_tools import delete_file as delete_file_util
 from src.file_tools import list_files as list_files_util
 from src.file_tools import normalize_path
 from src.file_tools import read_file as read_file_util
-from src.file_tools import write_file as write_file_util
+from src.file_tools import save_file as save_file_util
 
 # Configure logging
 logging.basicConfig(
@@ -20,23 +20,19 @@ logger = logging.getLogger(__name__)
 # Create a FastMCP server instance
 mcp = FastMCP("File System Service")
 
+# Store the project directory as a module-level variable
+_project_dir: Path = None
 
-def get_project_dir() -> Path:
+
+def set_project_dir(directory: Path) -> None:
+    """Set the project directory for file operations.
+
+    Args:
+        directory: The project directory path
     """
-    Get the absolute path to the project directory.
-
-    Returns:
-        Path object of the project directory
-
-    Raises:
-        RuntimeError: If MCP_PROJECT_DIR environment variable is not set
-    """
-    project_dir = os.environ.get("MCP_PROJECT_DIR")
-    if not project_dir:
-        raise RuntimeError(
-            "Project directory not set. Make sure to set the MCP_PROJECT_DIR environment variable."
-        )
-    return Path(project_dir)
+    global _project_dir
+    _project_dir = Path(directory)
+    logger.info(f"Project directory set to: {_project_dir}")
 
 
 @mcp.tool()
@@ -47,9 +43,12 @@ async def list_directory() -> List[str]:
         A list of filenames in the project directory
     """
     try:
-        project_dir = get_project_dir()
-        logger.info(f"Listing all files in project directory: {project_dir}")
-        result = list_files_util(".", use_gitignore=True)
+        if _project_dir is None:
+            raise ValueError("Project directory has not been set")
+
+        logger.info(f"Listing all files in project directory: {_project_dir}")
+        # Explicitly pass project_dir to list_files_util
+        result = list_files_util(".", project_dir=_project_dir, use_gitignore=True)
         return result
     except Exception as e:
         logger.error(f"Error listing project directory: {str(e)}")
@@ -66,9 +65,16 @@ async def read_file(file_path: str) -> str:
     Returns:
         The contents of the file as a string
     """
+    if not file_path or not isinstance(file_path, str):
+        logger.error(f"Invalid file path parameter: {file_path}")
+        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
+
+    if _project_dir is None:
+        raise ValueError("Project directory has not been set")
+
     logger.info(f"Reading file: {file_path}")
     try:
-        content = read_file_util(file_path)
+        content = read_file_util(file_path, project_dir=_project_dir)
         return content
     except Exception as e:
         logger.error(f"Error reading file: {str(e)}")
@@ -76,7 +82,7 @@ async def read_file(file_path: str) -> str:
 
 
 @mcp.tool()
-async def write_file(file_path: str, content: str) -> bool:
+async def save_file(file_path: str, content: str) -> bool:
     """Write content to a file.
 
     Args:
@@ -86,15 +92,80 @@ async def write_file(file_path: str, content: str) -> bool:
     Returns:
         True if the file was written successfully
     """
+    if not file_path or not isinstance(file_path, str):
+        logger.error(f"Invalid file path parameter: {file_path}")
+        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
+
+    if content is None:
+        logger.warning("Content is None, treating as empty string")
+        content = ""
+
+    if not isinstance(content, str):
+        logger.error(f"Invalid content type: {type(content)}")
+        raise ValueError(f"Content must be a string, got {type(content)}")
+
+    if _project_dir is None:
+        raise ValueError("Project directory has not been set")
+
     logger.info(f"Writing to file: {file_path}")
     try:
-        success = write_file_util(file_path, content)
+        success = save_file_util(file_path, content, project_dir=_project_dir)
         return success
     except Exception as e:
         logger.error(f"Error writing to file: {str(e)}")
         raise
 
 
+@mcp.tool()
+async def delete_this_file(file_path: str) -> bool:
+    """Delete a specified file from the filesystem.
+
+    Args:
+        file_path: Path to the file to delete (relative to project directory)
+
+    Returns:
+        True if the file was deleted successfully
+    """
+    # delete_file does not work with Claude Desktop (!!!)  ;-)
+    # Validate the file_path parameter
+    if not file_path or not isinstance(file_path, str):
+        logger.error(f"Invalid file path parameter: {file_path}")
+        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
+
+    if _project_dir is None:
+        raise ValueError("Project directory has not been set")
+
+    logger.info(f"Deleting file: {file_path}")
+    try:
+        # Directly delete the file without user confirmation
+        success = delete_file_util(file_path, project_dir=_project_dir)
+        logger.info(f"File deleted successfully: {file_path}")
+        return success
+    except Exception as e:
+        logger.error(f"Error deleting file {file_path}: {str(e)}")
+        raise
+
+
+def run_server(project_dir: Path) -> None:
+    """Run the MCP server with the given project directory.
+
+    Args:
+        project_dir: Path to the project directory
+    """
+    # Set the project directory
+    set_project_dir(project_dir)
+
+    # Run the server
+    mcp.run()
+
+
 # Run the server when the script is executed directly
 if __name__ == "__main__":
+    # The project directory should be set before running the server
+    # This case is primarily for testing; in production, main.py should set it
+    if _project_dir is None:
+        raise RuntimeError(
+            "Project directory not set. Please use set_project_dir() before running the server."
+        )
+
     mcp.run()

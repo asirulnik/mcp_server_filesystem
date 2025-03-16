@@ -2,11 +2,10 @@
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 
-from src.server import mcp
+from src.server import run_server
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +47,13 @@ def main() -> None:
         )
         sys.exit(1)
 
-    # Set the project directory as a global environment variable
-    os.environ["MCP_PROJECT_DIR"] = str(project_dir.absolute())
+    # Convert to absolute path
+    project_dir = project_dir.absolute()
 
     logger.info(f"Starting MCP server with project directory: {project_dir}")
 
-    # Start the server using FastMCP's run method
-    mcp.run()
+    # Run the server with the project directory
+    run_server(project_dir)
 
 
 if __name__ == "__main__":
