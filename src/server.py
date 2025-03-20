@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
+import structlog
 from mcp.server.fastmcp import FastMCP
 
 # Import utility functions from the main package
@@ -12,12 +13,11 @@ from src.file_tools import list_files as list_files_util
 from src.file_tools import normalize_path
 from src.file_tools import read_file as read_file_util
 from src.file_tools import save_file as save_file_util
+from src.log_utils import log_function_call
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Initialize loggers
 logger = logging.getLogger(__name__)
+structured_logger = structlog.get_logger(__name__)
 
 # Create a FastMCP server instance
 mcp = FastMCP("File System Service")
@@ -26,6 +26,7 @@ mcp = FastMCP("File System Service")
 _project_dir: Path = None
 
 
+@log_function_call
 def set_project_dir(directory: Path) -> None:
     """Set the project directory for file operations.
 
@@ -35,10 +36,12 @@ def set_project_dir(directory: Path) -> None:
     global _project_dir
     _project_dir = Path(directory)
     logger.info(f"Project directory set to: {_project_dir}")
+    structured_logger.info("Project directory set", project_dir=str(_project_dir))
 
 
 @mcp.tool()
-async def list_directory() -> List[str]:
+@log_function_call
+def list_directory() -> List[str]:
     """List files and directories in the project directory.
 
     Returns:
@@ -58,7 +61,8 @@ async def list_directory() -> List[str]:
 
 
 @mcp.tool()
-async def read_file(file_path: str) -> str:
+@log_function_call
+def read_file(file_path: str) -> str:
     """Read the contents of a file.
 
     Args:
@@ -84,7 +88,8 @@ async def read_file(file_path: str) -> str:
 
 
 @mcp.tool()
-async def save_file(file_path: str, content: str) -> bool:
+@log_function_call
+def save_file(file_path: str, content: str) -> bool:
     """Write content to a file.
 
     Args:
@@ -119,7 +124,8 @@ async def save_file(file_path: str, content: str) -> bool:
 
 
 @mcp.tool()
-async def append_file(file_path: str, content: str) -> bool:
+@log_function_call
+def append_file(file_path: str, content: str) -> bool:
     """Append content to the end of a file.
 
     Args:
@@ -154,7 +160,8 @@ async def append_file(file_path: str, content: str) -> bool:
 
 
 @mcp.tool()
-async def delete_this_file(file_path: str) -> bool:
+@log_function_call
+def delete_this_file(file_path: str) -> bool:
     """Delete a specified file from the filesystem.
 
     Args:
@@ -184,7 +191,8 @@ async def delete_this_file(file_path: str) -> bool:
 
 
 @mcp.tool()
-async def edit_file(
+@log_function_call
+def edit_file(
     path: str,
     edits: List[Dict[str, str]],
     dry_run: bool = False,
@@ -293,26 +301,27 @@ async def edit_file(
         raise
 
 
+@log_function_call
 def run_server(project_dir: Path) -> None:
     """Run the MCP server with the given project directory.
 
     Args:
         project_dir: Path to the project directory
     """
+    logger.debug("Entering run_server function")
+    structured_logger.debug(
+        "Entering run_server function", project_dir=str(project_dir)
+    )
+
     # Set the project directory
     set_project_dir(project_dir)
 
     # Run the server
+    logger.info("Starting MCP server")
+    structured_logger.info("Starting MCP server")
+    logger.debug("About to call mcp.run()")
+    structured_logger.debug("About to call mcp.run()", project_dir=str(project_dir))
     mcp.run()
-
-
-# Run the server when the script is executed directly
-if __name__ == "__main__":
-    # The project directory should be set before running the server
-    # This case is primarily for testing; in production, main.py should set it
-    if _project_dir is None:
-        raise RuntimeError(
-            "Project directory not set. Please use set_project_dir() before running the server."
-        )
-
-    mcp.run()
+    logger.debug(
+        "After mcp.run() call - this line will only execute if mcp.run() returns"
+    )
