@@ -193,111 +193,80 @@ def delete_this_file(file_path: str) -> bool:
 @mcp.tool()
 @log_function_call
 def edit_file(
-    path: str,
+    file_path: str,
     edits: List[Dict[str, str]],
     dry_run: bool = False,
     options: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
-    """Make selective edits using advanced pattern matching and formatting.
+    """Make selective edits to files while preserving formatting.
 
     Features:
-    - Line-based and multi-line content matching
-    - Whitespace normalization with indentation preservation
-    - Fuzzy matching with confidence scoring
-    - Multiple simultaneous edits with correct positioning
-    - Indentation style detection and preservation
-    - Git-style diff output with context
-    - Preview changes with dry run mode
-    - Failed match debugging with confidence scores
+        - Line-based and multi-line content matching
+        - Whitespace normalization with indentation preservation
+        - Multiple simultaneous edits with correct positioning
+        - Smart detection of already-applied edits
+        - Git-style diff output with context
+        - Preview changes with dry run mode
 
     Args:
-        path: File to edit
-        edits: List of edit operations (each containing oldText and newText)
+        file_path: Path to the file to edit (relative to project directory)
+        edits: List of edit operations (each containing old_text and new_text)
         dry_run: Preview changes without applying (default: False)
         options: Optional formatting settings
-            - preserveIndentation: Keep existing indentation (default: True)
-            - normalizeWhitespace: Normalize spaces while preserving structure (default: True)
-            - partialMatch: Enable fuzzy matching (default: True)
+                    - preserve_indentation: Keep existing indentation (default: True)
+                    - normalize_whitespace: Normalize spaces (default: True)
 
     Returns:
-        Detailed diff and match information for dry runs, otherwise applies changes
+        Detailed diff and match information including success status
     """
-    if not path or not isinstance(path, str):
-        logger.error(f"Invalid file path parameter: {path}")
-        raise ValueError(f"File path must be a non-empty string, got {type(path)}")
+    # Basic validation
+    if not file_path or not isinstance(file_path, str):
+        logger.error(f"Invalid file path parameter: {file_path}")
+        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
 
-    if not isinstance(edits, list):
+    if not isinstance(edits, list) or not edits:
         logger.error(f"Invalid edits parameter: {edits}")
-        raise ValueError(f"Edits must be a list, got {type(edits)}")
+        raise ValueError(f"Edits must be a non-empty list")
 
     if _project_dir is None:
         raise ValueError("Project directory has not been set")
 
-    # Ensure 'edits' objects use the correct keys
+    # Normalize edit operations (ensure proper format and required fields)
     normalized_edits = []
-    for edit in edits:
+    for i, edit in enumerate(edits):
         if not isinstance(edit, dict):
-            raise ValueError(f"Each edit must be a dictionary, got {type(edit)}")
+            raise ValueError(f"Edit #{i} must be a dictionary, got {type(edit)}")
 
-        # Map oldText/newText to old_text/new_text if needed
-        normalized_edit = {}
-        if "oldText" in edit:
-            normalized_edit["old_text"] = edit["oldText"]
-        elif "old_text" in edit:
-            normalized_edit["old_text"] = edit["old_text"]
-        else:
-            raise ValueError("Each edit must contain 'oldText' or 'old_text'")
+        # Validate required fields
+        if "old_text" not in edit or "new_text" not in edit:
+            missing = ", ".join([f for f in ["old_text", "new_text"] if f not in edit])
+            raise ValueError(f"Edit #{i} is missing required field(s): {missing}")
 
-        if "newText" in edit:
-            normalized_edit["new_text"] = edit["newText"]
-        elif "new_text" in edit:
-            normalized_edit["new_text"] = edit["new_text"]
-        else:
-            raise ValueError("Each edit must contain 'newText' or 'new_text'")
+        # Create normalized edit with just the fields we need
+        normalized_edits.append(
+            {"old_text": edit["old_text"], "new_text": edit["new_text"]}
+        )
 
-        normalized_edits.append(normalized_edit)
-
-    # Normalize the options dictionary if provided
+    # Process options (only extract the fields we support)
     normalized_options = {}
     if options:
-        # Map camelCase to snake_case if needed
-        if "preserveIndentation" in options:
-            normalized_options["preserve_indentation"] = options["preserveIndentation"]
-        elif "preserve_indentation" in options:
-            normalized_options["preserve_indentation"] = options["preserve_indentation"]
+        for opt in ["preserve_indentation", "normalize_whitespace"]:
+            if opt in options:
+                normalized_options[opt] = options[opt]
 
-        if "normalizeWhitespace" in options:
-            normalized_options["normalize_whitespace"] = options["normalizeWhitespace"]
-        elif "normalize_whitespace" in options:
-            normalized_options["normalize_whitespace"] = options["normalize_whitespace"]
-
-        if "partialMatch" in options:
-            normalized_options["partial_match"] = options["partialMatch"]
-        elif "partial_match" in options:
-            normalized_options["partial_match"] = options["partial_match"]
-
-        if "matchThreshold" in options:
-            normalized_options["match_threshold"] = options["matchThreshold"]
-        elif "match_threshold" in options:
-            normalized_options["match_threshold"] = options["match_threshold"]
-
-    logger.info(f"Editing file: {path}, dry_run: {dry_run}")
+    logger.info(f"Editing file: {file_path}, dry_run: {dry_run}")
 
     try:
-        # Normalize the path and call the utility function
-        normalized_path = path
-
-        result = edit_file_util(
-            normalized_path,
+        # Call the implementation function
+        return edit_file_util(
+            file_path,  # Already normalized by path_utils in the utility function
             normalized_edits,
             dry_run=dry_run,
             options=normalized_options,
             project_dir=_project_dir,
         )
-
-        return result
     except Exception as e:
-        logger.error(f"Error editing file {path}: {str(e)}")
+        logger.error(f"Error editing file {file_path}: {str(e)}")
         raise
 
 
