@@ -18,6 +18,8 @@ Please let me know whether you find any issues.
 
 Each test below is self-contained and should be run independently. All commands shown are meant to be executed using the MCP tools interface.
 
+Please execute each of the steps by calling the MCP tools.
+
 ### Test 1: Basic Text Replacement
 **Goal**: Verify basic text replacement functionality
 
