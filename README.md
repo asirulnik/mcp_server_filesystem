@@ -214,19 +214,23 @@ The server exposes the following MCP tools:
 
 ## Development
 
-### Setting Up Development Environment
+### Setting up the development environment on windows
 
-```bash
-# Clone the repository
+```cmd
+REM Clone the repository
 git clone https://github.com/MarcusJellinghaus/mcp_server_filesystem.git
 cd mcp-server-filesystem
 
-# Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+REM Create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\activate
 
-# Install dependencies
+REM Install dependencies
 pip install -e .
+
+REM Install development dependencies
+pip install -e ".[dev]"
+
 ```
 
 ## Running with MCP Dev Tools
@@ -245,3 +249,4 @@ The MIT License is a permissive license that allows reuse with minimal restricti
 ## Links
 
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
+- [MCP Python Code Checker](https://github.com/MarcusJellinghaus/mcp_server_code_checker_python)
