@@ -1,5 +1,5 @@
-"""File operations utilities."""
-"""/Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem/src/file_tools/file_operations.py"""
+"""File operations utilities. """
+"""/Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem/build/lib/file_tools/file_operations.py"""
 
 import logging
 import os
@@ -77,7 +77,7 @@ def save_file(file_path: str, content: str, project_dir: Path) -> bool:
         project_dir: Project directory path
 
     Returns:
-        True if the file was written successfully Moo!
+        True if the file was written successfully Moo! 
 
     Raises:
         PermissionError: If access to the file is denied

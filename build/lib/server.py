@@ -1,5 +1,5 @@
-# /Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem/src/server.py
-import logging
+# /Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem/build/lib/server.pyimport logging
+
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -15,7 +15,6 @@ from src.file_tools import normalize_path
 from src.file_tools import read_file as read_file_util
 from src.file_tools import save_file as save_file_util
 from src.log_utils import log_function_call
-
 
 # Initialize loggers
 logger = logging.getLogger(__name__)
@@ -39,6 +38,7 @@ def set_project_dir(directory: Path) -> None:
     _project_dir = Path(directory)
     logger.info(f"Project directory set to: {_project_dir}")
     structured_logger.info("Project directory set", project_dir=str(_project_dir))
+
 
 @mcp.tool()
 @log_function_call
@@ -91,14 +91,14 @@ def read_file(file_path: str) -> str:
 @mcp.tool()
 @log_function_call
 def save_file(file_path: str, content: str) -> bool:
-    """Write content to a file. CAUTION: Saving (writing) very large files in one operation can cause a Response-Limit Loop, in which Claude's response is interrupted when it exceeds its response size limit, then the user reprompts "continue", and Claude starts saving (writing) the file from the beginning again, and reaches its response size limit again, and the user reprompts "continue" again ad infinitem until the session limit is reached.  The better approach is to use save_file (write) a reasonably  sized part of the file (ending at a logical division point, such as the end of a function definition,  if possible), then stop and ask the user for permission to continue; if user responds in the affirmative, use 'append_file' to add a reasonably sized chunk, stop and ask the user for permission  to continue, and repeat the append_file -> stop-to-seek-user's-approval-to-continue -> repeat loop until the complete file is written.
+    """Write content to a file.
 
     Args:
         file_path: Path to the file to write to (relative to project directory)
         content: Content to write to the file
 
     Returns:
-        True if the file was written successfully
+        True if the file was written successfully Moo!
     """
     if not file_path or not isinstance(file_path, str):
         logger.error(f"Invalid file path parameter: {file_path}")
@@ -273,8 +273,6 @@ def edit_file(
 
 @log_function_call
 def run_server(project_dir: Path) -> None:
-    
-    
     """Run the MCP server with the given project directory.
 
     Args:
