@@ -91,11 +91,11 @@ def read_file(file_path: str) -> str:
 @mcp.tool()
 @log_function_call
 def save_file(file_path: str, content: str) -> bool:
-    """Write content to a file.
+    """Write content to a file specified by an ABSOLUTE path. ** WARNING: For large text files (more than about 300 lines), write them in parts, stopping every 300 lines or so to ask user if he wants you to continue. For such files, start by using save_file to save the first 100 lines but then STOP and wait for the user to tell you to continue. Then, write the next 400 lines using append_file, and then stop and ask the user if he wants you to continue. Repeat the process of appending about 400 lines to the end of the file and stopping to ask the user if he wants you to continue in a loop until the whole file is written. **
 
     Args:
-        file_path: Path to the file to write to (relative to project directory)
-        content: Content to write to the file
+        file_path: Path to the file to write to the absolute path
+        content: Content to write to the file. 
 
     Returns:
         True if the file was written successfully Moo!

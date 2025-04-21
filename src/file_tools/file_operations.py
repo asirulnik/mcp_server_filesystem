@@ -1,286 +1,230 @@
-"""File operations utilities."""
-"""/Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem/src/file_tools/file_operations.py"""
+# src/file_tools/file_operations.py (Revised for Absolute Paths)
+"""File operations utilities using absolute paths."""
 
 import logging
 import os
 import tempfile
 from pathlib import Path
 
-from .path_utils import normalize_path
+# REMOVED: from .path_utils import normalize_path
 
 logger = logging.getLogger(__name__)
 
 
-def read_file(file_path: str, project_dir: Path) -> str:
+def read_file(abs_path: Path) -> str:
     """
-    Read the contents of a file.
+    Read the contents of a file specified by an absolute Path object.
 
     Args:
-        file_path: Path to the file to read (relative to project directory)
-        project_dir: Project directory path
+        abs_path: Absolute Path object of the file to read.
 
     Returns:
-        The contents of the file as a string
+        The contents of the file as a string.
 
     Raises:
-        FileNotFoundError: If the file does not exist
-        PermissionError: If access to the file is denied
-        ValueError: If the file is outside the project directory
+        FileNotFoundError: If the file does not exist.
+        IsADirectoryError: If the path points to a directory.
+        PermissionError: If access to the file is denied.
+        ValueError: If the file contains invalid characters.
     """
-    # Validate file_path parameter
-    if not file_path or not isinstance(file_path, str):
-        logger.error(f"Invalid file path: {file_path}")
-        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
-
-    # Validate project_dir parameter
-    if project_dir is None:
-        raise ValueError("Project directory cannot be None")
-
-    # Normalize the path to be relative to the project directory
-    abs_path, rel_path = normalize_path(file_path, project_dir)
-
+    # Path validation (existence, is_file) still important
     if not abs_path.exists():
-        logger.error(f"File not found: {file_path}")
-        raise FileNotFoundError(f"File '{file_path}' does not exist")
+        logger.error(f"File not found: {abs_path}")
+        raise FileNotFoundError(f"File '{abs_path}' does not exist")
 
     if not abs_path.is_file():
-        logger.error(f"Path is not a file: {file_path}")
-        raise IsADirectoryError(f"Path '{file_path}' is not a file")
+        logger.error(f"Path is not a file: {abs_path}")
+        raise IsADirectoryError(f"Path '{abs_path}' is not a file")
 
     file_handle = None
     try:
-        logger.debug(f"Reading file: {rel_path}")
+        logger.debug(f"Reading file: {abs_path}")
+        # Open using the absolute path directly
         file_handle = open(abs_path, "r", encoding="utf-8")
         content = file_handle.read()
-        logger.debug(f"Successfully read {len(content)} bytes from {rel_path}")
+        logger.debug(f"Successfully read {len(content)} bytes from {abs_path}")
         return content
     except UnicodeDecodeError as e:
-        logger.error(f"Unicode decode error while reading {rel_path}: {str(e)}")
+        logger.error(f"Unicode decode error while reading {abs_path}: {str(e)}")
         raise ValueError(
-            f"File '{file_path}' contains invalid characters. Ensure it's a valid text file."
+            f"File '{abs_path}' contains invalid characters. Ensure it's a valid text file."
         ) from e
+    except PermissionError as e:
+        logger.error(f"Permission denied reading file {abs_path}: {str(e)}")
+        raise
     except Exception as e:
-        logger.error(f"Error reading file {rel_path}: {str(e)}")
+        logger.error(f"Error reading file {abs_path}: {str(e)}")
         raise
     finally:
         if file_handle is not None:
             file_handle.close()
 
 
-def save_file(file_path: str, content: str, project_dir: Path) -> bool:
+def save_file(abs_path: Path, content: str) -> bool:
     """
-    Write content to a file atomically.
+    Write content to a file specified by an absolute Path object, atomically.
 
     Args:
-        file_path: Path to the file to write to (relative to project directory)
-        content: Content to write to the file
-        project_dir: Project directory path
+        abs_path: Absolute Path object of the file to write to.
+        content: Content to write to the file.
 
     Returns:
-        True if the file was written successfully Moo!
+        True if the file was written successfully.
 
     Raises:
-        PermissionError: If access to the file is denied
-        ValueError: If the file is outside the project directory
+        PermissionError: If access to the file or directory is denied.
+        ValueError: If content contains unencodable characters.
     """
-    # Validate file_path parameter
-    if not file_path or not isinstance(file_path, str):
-        logger.error(f"Invalid file path: {file_path}")
-        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
+    # Content validation remains the same
+    if content is None: content = ""
+    if not isinstance(content, str): raise ValueError(f"Content must be a string, got {type(content)}")
 
-    # Validate content parameter
-    if content is None:
-        logger.warning("Content is None, treating as empty string")
-        content = ""
-
-    if not isinstance(content, str):
-        logger.error(f"Invalid content type: {type(content)}")
-        raise ValueError(f"Content must be a string, got {type(content)}")
-
-    # Validate project_dir parameter
-    if project_dir is None:
-        raise ValueError("Project directory cannot be None")
-
-    # Normalize the path to be relative to the project directory
-    abs_path, rel_path = normalize_path(file_path, project_dir)
-
-    # Create directory if it doesn't exist
+    # Create parent directory if it doesn't exist
     try:
-        if not abs_path.parent.exists():
-            logger.info(f"Creating directory: {abs_path.parent}")
-            abs_path.parent.mkdir(parents=True)
+        parent_dir = abs_path.parent
+        if not parent_dir.exists():
+            logger.info(f"Creating directory: {parent_dir}")
+            parent_dir.mkdir(parents=True, exist_ok=True) # Use exist_ok=True
     except PermissionError as e:
-        logger.error(
-            f"Permission denied creating directory {abs_path.parent}: {str(e)}"
-        )
+        logger.error(f"Permission denied creating directory {parent_dir}: {str(e)}")
         raise
     except Exception as e:
-        logger.error(f"Error creating directory {abs_path.parent}: {str(e)}")
+        logger.error(f"Error creating directory {parent_dir}: {str(e)}")
         raise
 
     # Use a temporary file for atomic write
-    temp_file = None
+    temp_file_path_obj = None
+    temp_file_handle = None
     try:
-        # Create a temporary file in the same directory as the target
-        # This ensures the atomic move works across filesystems
-        temp_fd, temp_path = tempfile.mkstemp(dir=str(abs_path.parent))
-        temp_file = Path(temp_path)
+        # Create temp file in the same directory as the target
+        # Use delete=False and manage cleanup manually for more control
+        temp_file_handle = tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=str(parent_dir), delete=False)
+        temp_file_path_obj = Path(temp_file_handle.name)
 
-        logger.debug(f"Writing to temporary file for {rel_path}")
+        logger.debug(f"Writing to temporary file '{temp_file_path_obj}' for target '{abs_path}'")
 
         # Write content to temporary file
-        with open(temp_fd, "w", encoding="utf-8") as f:
-            try:
-                f.write(content)
-            except UnicodeEncodeError as e:
-                logger.error(
-                    f"Unicode encode error while writing to {rel_path}: {str(e)}"
-                )
-                raise ValueError(
-                    f"Content contains characters that cannot be encoded. Please check the encoding."
-                ) from e
+        try:
+            temp_file_handle.write(content)
+        except UnicodeEncodeError as e:
+            logger.error(f"Unicode encode error while writing to temp file for {abs_path}: {str(e)}")
+            raise ValueError("Content contains characters that cannot be encoded.") from e
+        finally:
+             if temp_file_handle: temp_file_handle.close() # Ensure file is closed before moving
 
         # Atomically replace the target file
-        logger.debug(f"Atomically replacing {rel_path} with temporary file")
+        logger.debug(f"Atomically replacing {abs_path} with {temp_file_path_obj}")
         try:
-            # On Windows, we need to remove the target file first
-            if os.name == "nt" and abs_path.exists():
-                abs_path.unlink()
-            os.replace(temp_path, str(abs_path))
+            # os.replace is generally atomic on POSIX and handles Windows cases better
+            os.replace(str(temp_file_path_obj), str(abs_path))
+            temp_file_path_obj = None # Prevent deletion in finally block if replace succeeds
+        except PermissionError as e:
+             logger.error(f"Permission denied replacing file {abs_path}: {str(e)}")
+             raise
         except Exception as e:
-            logger.error(f"Error replacing file {rel_path}: {str(e)}")
+            logger.error(f"Error replacing file {abs_path}: {str(e)}")
             raise
 
-        logger.debug(f"Successfully wrote {len(content)} bytes to {rel_path}")
+        logger.debug(f"Successfully wrote {len(content)} bytes to {abs_path}")
         return True
 
     except Exception as e:
-        logger.error(f"Error writing to file {rel_path}: {str(e)}")
+        logger.error(f"Error writing to file {abs_path}: {str(e)}")
         raise
-
     finally:
-        # Clean up the temporary file if it still exists
-        if temp_file and temp_file.exists():
+        # Clean up the temporary file if it still exists (i.e., if os.replace failed)
+        if temp_file_path_obj and temp_file_path_obj.exists():
             try:
-                temp_file.unlink()
-            except Exception as e:
-                logger.warning(
-                    f"Failed to clean up temporary file {temp_file}: {str(e)}"
-                )
-
+                logger.warning(f"Cleaning up leftover temporary file: {temp_file_path_obj}")
+                temp_file_path_obj.unlink()
+            except Exception as cleanup_e:
+                logger.error(f"Failed to clean up temporary file {temp_file_path_obj}: {cleanup_e}")
 
 # Keep write_file for backward compatibility
 write_file = save_file
 
 
-def append_file(file_path: str, content: str, project_dir: Path) -> bool:
+def append_file(abs_path: Path, content: str) -> bool:
     """
-    Append content to the end of a file.
+    Append content to the end of a file specified by an absolute Path object.
 
     Args:
-        file_path: Path to the file to append to (relative to project directory)
-        content: Content to append to the file
-        project_dir: Project directory path
+        abs_path: Absolute Path object of the file to append to.
+        content: Content to append to the file.
 
     Returns:
-        True if the content was appended successfully
+        True if the content was appended successfully.
 
     Raises:
-        FileNotFoundError: If the file does not exist
-        PermissionError: If access to the file is denied
-        ValueError: If the file is outside the project directory
+        FileNotFoundError: If the file does not exist.
+        IsADirectoryError: If the path points to a directory.
+        PermissionError: If access to the file is denied.
+        ValueError: If content is invalid.
     """
-    # Validate file_path parameter
-    if not file_path or not isinstance(file_path, str):
-        logger.error(f"Invalid file path: {file_path}")
-        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
+    # Content validation
+    if content is None: content = ""
+    if not isinstance(content, str): raise ValueError(f"Content must be a string, got {type(content)}")
 
-    # Validate content parameter
-    if content is None:
-        logger.warning("Content is None, treating as empty string")
-        content = ""
-
-    if not isinstance(content, str):
-        logger.error(f"Invalid content type: {type(content)}")
-        raise ValueError(f"Content must be a string, got {type(content)}")
-
-    # Validate project_dir parameter
-    if project_dir is None:
-        raise ValueError("Project directory cannot be None")
-
-    # Normalize the path to be relative to the project directory
-    abs_path, rel_path = normalize_path(file_path, project_dir)
-
-    # Check if the file exists
+    # Check if the file exists and is a file (read_file will also check this)
     if not abs_path.exists():
-        logger.error(f"File not found: {file_path}")
-        raise FileNotFoundError(f"File '{file_path}' does not exist")
+        logger.error(f"File not found: {abs_path}")
+        raise FileNotFoundError(f"File '{abs_path}' does not exist for appending")
 
     if not abs_path.is_file():
-        logger.error(f"Path is not a file: {file_path}")
-        raise IsADirectoryError(f"Path '{file_path}' is not a file")
+        logger.error(f"Path is not a file: {abs_path}")
+        raise IsADirectoryError(f"Path '{abs_path}' is not a file")
 
     try:
-        # Read existing content
-        existing_content = read_file(file_path, project_dir)
-
-        # Append new content
-        combined_content = existing_content + content
-
-        # Use save_file to write the combined content
-        logger.debug(f"Appending {len(content)} bytes to {rel_path}")
-        return save_file(file_path, combined_content, project_dir)
-
-    except Exception as e:
-        logger.error(f"Error appending to file {rel_path}: {str(e)}")
-        raise
-
-
-def delete_file(file_path: str, project_dir: Path) -> bool:
-    """
-    Delete a file.
-
-    Args:
-        file_path: Path to the file to delete (relative to project directory)
-        project_dir: Project directory path
-
-    Returns:
-        True if the file was deleted successfully
-
-    Raises:
-        FileNotFoundError: If the file does not exist
-        PermissionError: If access to the file is denied
-        IsADirectoryError: If the path points to a directory
-        ValueError: If the file is outside the project directory or the parameter is invalid
-    """
-    # Validate file_path parameter
-    if not file_path or not isinstance(file_path, str):
-        logger.error(f"Invalid file path: {file_path}")
-        raise ValueError(f"File path must be a non-empty string, got {type(file_path)}")
-
-    # Validate project_dir parameter
-    if project_dir is None:
-        raise ValueError("Project directory cannot be None")
-
-    # Normalize the path to be relative to the project directory
-    abs_path, rel_path = normalize_path(file_path, project_dir)
-
-    if not abs_path.exists():
-        logger.error(f"File not found: {file_path}")
-        raise FileNotFoundError(f"File '{file_path}' does not exist")
-
-    if not abs_path.is_file():
-        logger.error(f"Path is not a file: {file_path}")
-        raise IsADirectoryError(f"Path '{file_path}' is not a file or is a directory")
-
-    try:
-        logger.debug(f"Deleting file: {rel_path}")
-        abs_path.unlink()
-        logger.debug(f"Successfully deleted file: {rel_path}")
+        # Appending is simpler, can often be done directly
+        # Using 'a' mode handles file creation implicitly if needed, but we check existence first
+        logger.debug(f"Appending {len(content)} bytes to {abs_path}")
+        with open(abs_path, "a", encoding="utf-8") as f:
+            f.write(content)
+        logger.debug(f"Successfully appended to {abs_path}")
         return True
     except PermissionError as e:
-        logger.error(f"Permission denied when deleting file {rel_path}: {str(e)}")
+        logger.error(f"Permission denied appending to file {abs_path}: {str(e)}")
+        raise
+    except UnicodeEncodeError as e:
+         logger.error(f"Unicode encode error while appending to {abs_path}: {str(e)}")
+         raise ValueError("Content contains characters that cannot be encoded.") from e
+    except Exception as e:
+        logger.error(f"Error appending to file {abs_path}: {str(e)}")
+        raise
+
+
+def delete_file(abs_path: Path) -> bool:
+    """
+    Delete a file specified by an absolute Path object.
+
+    Args:
+        abs_path: Absolute Path object of the file to delete.
+
+    Returns:
+        True if the file was deleted successfully.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        IsADirectoryError: If the path points to a directory.
+        PermissionError: If access to the file is denied.
+    """
+    # Path validation
+    if not abs_path.exists():
+        logger.error(f"File not found: {abs_path}")
+        raise FileNotFoundError(f"File '{abs_path}' does not exist")
+
+    if not abs_path.is_file():
+        logger.error(f"Path is not a file: {abs_path}")
+        raise IsADirectoryError(f"Path '{abs_path}' is not a file")
+
+    try:
+        logger.debug(f"Deleting file: {abs_path}")
+        abs_path.unlink()
+        logger.debug(f"Successfully deleted file: {abs_path}")
+        return True
+    except PermissionError as e:
+        logger.error(f"Permission denied when deleting file {abs_path}: {str(e)}")
         raise
     except Exception as e:
-        logger.error(f"Error deleting file {rel_path}: {str(e)}")
+        logger.error(f"Error deleting file {abs_path}: {str(e)}")
         raise

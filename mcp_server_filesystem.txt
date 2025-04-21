@@ -1,0 +1,491 @@
+MCP Filesystem Server Specification for LLM Interaction
+1. Introduction
+This document provides a comprehensive specification for an LLM to effectively utilize the MCP Filesystem Server. This server enables secure and efficient file system operations, optimized for interaction with large files and directories.  The server is designed to be used by an LLM, such as Claude, to access and manipulate files and directories in a controlled environment.
+
+2. Core Functionality
+The MCP Filesystem Server provides a range of tools, categorized as follows:
+
+2.1 Basic File Operations
+
+read_file: Reads the entire content of a file.
+
+read_multiple_files: Reads multiple files at once, returning a dictionary of results.
+
+write_file: Creates or overwrites a file with provided content.
+
+create_directory: Creates a new directory.
+
+list_directory: Lists files and directories within a specified path.
+
+move_file: Moves or renames a file or directory.
+
+get_file_info: Retrieves detailed metadata about a file or directory.
+
+list_allowed_directories: Retrieves a list of directories the server is allowed to access.
+
+2.2 Line-Targeted Operations
+
+read_file_lines: Reads specific lines from a file, with offset and limit parameters.
+
+edit_file_at_line: Edits specific lines in a text file, supporting actions like replace, insert, and delete.  Includes content verification to prevent unintended changes.
+
+head_file: Reads the first N lines of a text file.
+
+tail_file: Reads the last N lines of a text file.
+
+2.3 Advanced Search
+
+grep_files: Searches for patterns in files, similar to the grep command, with ripgrep integration for performance.
+
+search_files: Searches for files matching patterns, with optional content matching.
+
+directory_tree: Retrieves a recursive tree view of files and directories.
+
+2.4 Analytics and Reporting
+
+calculate_directory_size: Calculates the total size of a directory.
+
+find_duplicate_files: Finds duplicate files by comparing their content.
+
+compare_files: Compares two text files and shows the differences.
+
+find_large_files: Finds files larger than a specified size.
+
+find_empty_directories: Finds empty directories.
+
+3. Security
+The server enforces strict security measures:
+
+All operations are restricted to explicitly allowed directories.
+
+The server prevents path traversal attacks.
+
+Symlinks are validated to ensure they point within allowed directories.
+
+Error messages are designed to be informative without exposing sensitive information.
+
+4. Key Usage Patterns for LLMs
+4.1 Efficiently Handling Large Files
+
+Smart Context Discovery: Use grep_files to locate specific content within large files.  Leverage context controls (context_before, context_after) and result pagination (results_offset, results_limit) to manage token usage.
+
+Targeted Reading: Use read_file_lines to read only the relevant sections of a large file, avoiding the need to load the entire file into memory.
+
+4.2 Precise File Manipulation
+
+Line-Targeted Editing: Use edit_file_at_line for precise modifications, such as replacing specific lines, inserting new content, or deleting lines.  Utilize the expected_content parameter for content verification to prevent conflicts.
+
+4.3 Codebase Analysis
+
+Context-Aware Search: Employ grep_files to search for code patterns, taking advantage of its context-aware output to understand the surrounding code.
+
+Directory Structure Exploration: Use directory_tree to understand the layout of a codebase.
+
+4.4 Data Analysis
+
+Duplicate Detection: Use find_duplicate_files to identify redundant data.
+
+File Comparison: Use compare_files to analyze differences between file versions.
+
+Size Analysis: Use calculate_directory_size and find_large_files to manage storage space.
+
+5. Parameter Details and Best Practices
+5.1 Paths
+
+Always use absolute paths for consistency.  Relative paths may lead to unexpected behavior.
+
+When providing paths to the MCP server, ensure they fall within the allowed directories.  Use the list_allowed_directories tool to verify the allowed paths.
+
+5.2 Encodings
+
+Specify the correct encoding (e.g., "utf-8", "latin-1") when reading or writing files to prevent data corruption.  The default encoding is "utf-8".
+
+5.3 Line Numbers
+
+The edit_file_at_line tool uses 1-based line numbering by default.  The relative_line_numbers parameter allows for 0-based line numbers relative to a specified offset.
+
+5.4 Grep Patterns
+
+The grep_files tool supports both plain text and regular expression patterns.  Use the is_regex parameter to specify the pattern type.  Be aware that backslashes in JSON strings may need to be escaped (e.g., "\\\\s" for "\s").
+
+5.5 Output Formats
+
+Some tools support both text and JSON output formats.  The JSON format is recommended for structured data that needs to be parsed by the LLM.
+
+5.6 Error Handling
+
+The server provides informative error messages.  The LLM should gracefully handle errors and provide feedback to the user.
+
+6. Tools Reference
+6.1 Tool: read_file
+
+Description: Reads the complete contents of a file.
+
+Parameters:
+
+path (str): Path to the file.
+
+encoding (str, optional): File encoding. Default: "utf-8".
+
+Returns: File content as a string.
+
+6.2 Tool: read_multiple_files
+
+Description: Reads multiple files at once.
+
+Parameters:
+
+paths (List[str]): List of file paths.
+
+encoding (str, optional): File encoding. Default: "utf-8".
+
+Returns: Dictionary mapping file paths to their content.  Errors are included in the dictionary.
+
+6.3 Tool: write_file
+
+Description: Creates a new file or overwrites an existing file.
+
+Parameters:
+
+path (str): Path to the file.
+
+content (str): Content to write.
+
+encoding (str, optional): File encoding. Default: "utf-8".
+
+create_dirs (bool, optional): Whether to create parent directories.  Default: False.
+
+Returns: Success or error message.
+
+6.4 Tool: create_directory
+
+Description: Creates a new directory.
+
+Parameters:
+
+path (str): Path to the directory.
+
+parents (bool, optional): Create parent directories. Default: True.
+
+exist_ok (bool, optional): Don't raise error if the directory exists. Default: True.
+
+Returns: Success or error message.
+
+6.5 Tool: list_directory
+
+Description: Lists files and directories in a directory.
+
+Parameters:
+
+path (str): Path to the directory.
+
+include_hidden (bool, optional): Include hidden files. Default: False.
+
+pattern (str, optional): Glob pattern to filter entries.
+
+format (str, optional): Output format ("text" or "json"). Default: "text".
+
+Returns: Formatted directory listing.
+
+6.6 Tool: move_file
+
+Description: Moves or renames a file or directory.
+
+Parameters:
+
+source (str): Source path.
+
+destination (str): Destination path.
+
+overwrite (bool, optional): Overwrite existing destination. Default: False.
+
+Returns: Success or error message.
+
+6.7 Tool: get_file_info
+
+Description: Retrieves detailed metadata about a file or directory.
+
+Parameters:
+
+path (str): Path to the file or directory.
+
+format (str, optional): Output format ("text" or "json"). Default: "text".
+
+Returns: File metadata.
+
+6.8 Tool: list_allowed_directories
+
+Description: Retrieves a list of directories the server is allowed to access.
+
+Parameters: None.
+
+Returns: List of allowed directories.
+
+6.9 Tool: edit_file
+
+Description: Makes line-based edits to a text file.
+
+Parameters:
+
+path (str): Path to the file.
+
+edits (List[Dict[str, str]]): List of {"oldText": str, "newText": str} dictionaries.
+
+encoding (str, optional): File encoding. Default: "utf-8".
+
+dry_run (bool, optional): If True, returns diff without modifying the file. Default: False.
+
+Returns: Git-style diff showing changes.
+
+6.10 Tool: head_file
+
+Description: Reads the first N lines of a text file.
+
+Parameters:
+
+path (str): Path to the file.
+
+lines (int, optional): Number of lines to read. Default: 10.
+
+encoding (str, optional): File encoding. Default: "utf-8".
+
+Returns: First N lines of the file.
+
+6.11 Tool: tail_file
+
+Description: Reads the last N lines of a text file.
+
+Parameters:
+
+path (str): Path to the file.
+
+lines (int, optional): Number of lines to read. Default: 10.
+
+encoding (str, optional): File encoding. Default: "utf-8".
+
+Returns: Last N lines of the file.
+
+6.12 Tool: search_files
+
+Description: Searches for files matching a pattern, with optional content matching.
+
+Parameters:
+
+path (str): Starting directory for the search.
+
+pattern (str): Glob pattern to match against filenames.
+
+recursive (bool, optional): Whether to search subdirectories. Default: True.
+
+exclude_patterns (Optional[List[str]], optional): Patterns to exclude.
+
+content_match (Optional[str], optional): Text to search within files.
+
+max_results (int, optional): Maximum number of results. Default: 100.
+
+format (str, optional): Output format ("text" or "json"). Default: "text".
+
+Returns: List of matching file information.
+
+6.13 Tool: directory_tree
+
+Description: Gets a recursive tree view of files and directories.
+
+Parameters:
+
+path (str): Root directory.
+
+max_depth (int, optional): Maximum recursion depth. Default: 3.
+
+include_files (bool, optional): Whether to include files. Default: True.
+
+pattern (Optional[str], optional): Glob pattern to filter.
+
+exclude_patterns (Optional[List[str]], optional): Patterns to exclude.
+
+format (str, optional): Output format ('text' or 'json'). Default: 'text'.
+
+Returns: Formatted directory tree.
+
+6.14 Tool: calculate_directory_size
+
+Description: Calculates the total size of a directory.
+
+Parameters:
+
+path (str): Path to the directory.
+
+format (str, optional): Output format ("human", "bytes", or "json"). Default: "human".
+
+Returns: Directory size information.
+
+6.15 Tool: find_duplicate_files
+
+Description: Finds duplicate files by comparing file sizes and contents.
+
+Parameters:
+
+path (str): Starting directory.
+
+recursive (bool, optional): Whether to search subdirectories. Default: True.
+
+min_size (int, optional): Minimum file size (bytes). Default: 1.
+
+exclude_patterns (Optional[List[str]], optional): Patterns to exclude.
+
+max_files (int, optional): Maximum number of files to scan.  Default: 1000
+
+format (str, optional): Output format ("text" or "json"). Default: "text".
+
+Returns: Duplicate file information.
+
+6.16 Tool: compare_files
+
+Description: Compares two text files and shows differences.
+
+Parameters:
+
+file1 (str): First file path.
+
+file2 (str): Second file path.
+
+encoding (str, optional): File encoding. Default: "utf-8".
+
+format (str, optional): Output format ("text" or "json").  Default: "text".
+
+Returns: Comparison results.
+
+6.17 Tool: find_large_files
+
+Description: Finds files larger than the specified size.
+
+Parameters:
+
+path (str): Starting directory.
+
+min_size_mb (float, optional): Minimum file size in MB. Default: 100.
+
+recursive (bool, optional): Whether to search subdirectories. Default: True.
+
+max_results (int, optional): Maximum number of results. Default: 100.
+
+exclude_patterns (Optional[List[str]], optional): Exclude patterns.
+
+format (str, optional): Output format ("text" or "json"). Default: "text".
+
+Returns: Large file information.
+
+6.18 Tool: find_empty_directories
+
+Description: Finds empty directories.
+
+Parameters:
+
+path (str): Starting directory.
+
+recursive (bool, optional): Whether to search subdirectories. Default: True.
+
+exclude_patterns (Optional[List[str]], optional): Exclude patterns.
+
+format (str, optional): Output format ("text" or "json"). Default: "text".
+
+Returns: Empty directory information.
+
+6.19 Tool: grep_files
+
+Description: Searches for a pattern in files, similar to grep.
+
+Parameters:
+
+path (str): Starting directory or file path.
+
+pattern (str): Text or regex pattern.
+
+is_regex (bool, optional): Whether pattern is a regex. Default: False.
+
+case_sensitive (bool, optional): Whether search is case-sensitive. Default: True.
+
+whole_word (bool, optional): Match whole words only. Default: False.
+
+include_patterns (Optional[List[str]], optional): Include only these files.
+
+exclude_patterns (Optional[List[str]], optional): Exclude these files.
+
+context_lines (int, optional): Lines before and after matches. Default: 0.
+
+context_before (int, optional): Lines before matches.  Default: 0
+
+context_after (int, optional): Lines after matches. Default: 0
+
+results_offset (int, optional): Start at Nth match. Default: 0.
+
+results_limit (Optional[int], optional): Maximum matches to return.
+
+max_results (int, optional): Maximum total matches. Default: 1000.
+
+max_file_size_mb (float, optional): Skip files larger than this (MB). Default: 10.
+
+recursive (bool, optional): Search subdirectories. Default: True.
+
+max_depth (Optional[int], optional): Maximum directory depth.
+
+count_only (bool, optional): Only show match counts per file. Default: False.
+
+format (str, optional): Output format ("text" or "json"). Default: "text".
+
+Returns: Search results.
+
+6.20 Tool: read_file_lines
+
+Description: Reads specific lines from a text file.
+
+Parameters:
+
+path (str): Path to the file
+
+offset (int, optional): Line offset (0-based). Default: 0.
+
+limit (Optional[int], optional): Maximum number of lines to read.
+
+encoding (str, optional): Text encoding. Default: "utf-8".
+
+Returns: File content and metadata.
+
+6.21 Tool: edit_file_at_line
+
+Description: Edits specific lines in a text file.
+
+Parameters:
+
+path (str): Path to the file.
+
+line_edits (List[Dict[str, Any]]): List of edits.  Each edit is a dictionary.
+
+offset (int, optional): Line offset. Default: 0.
+
+limit (Optional[int], optional): Maximum number of lines to consider.
+
+relative_line_numbers (bool, optional): Whether line numbers in edits are relative to offset. Default: False.
+
+abort_on_verification_failure (bool, optional): Abort if verification fails. Default: False.
+
+encoding (str, optional): Text encoding. Default: "utf-8".
+
+dry_run (bool, optional): Preview changes without modifying the file. Default: False.
+
+Returns: Edit results.  Includes verification information.
+
+7. Best Practices for LLM Integration
+Plan Complex Operations: For tasks involving multiple file operations, create a plan before executing tools.  This allows for better error handling and recovery.
+
+Use JSON Output: When the output needs to be parsed by the LLM, specify the "format": "json" parameter whenever available.  This provides structured data that is easier to process.
+
+Handle Errors Gracefully: Implement error handling to catch exceptions and provide informative feedback to the user.
+
+Respect Security:  Only request operations within the allowed directories.  Do not attempt to access files or directories outside of these boundaries.
+
+Optimize for Token Efficiency:  Use line-targeted operations and result pagination to minimize the amount of data that needs to be included in the context.
+
+Provide Clear Instructions: When calling tools, provide clear and specific instructions in the tool's arguments to ensure the server performs the intended action.
+
+By adhering to these guidelines, LLMs can effectively leverage the MCP Filesystem Server to perform a wide range of file system operations in a secure, efficient, and intelligent manner.

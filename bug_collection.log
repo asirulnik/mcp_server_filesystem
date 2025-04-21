@@ -1,0 +1,13 @@
+## [2025-04-19 10:00:00] Git Clone Error
+
+### Command
+`mkdir -p /Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem && git clone https://github.com/asirulnik/mcp-outlook.git --branch snapshot-20250415-build-investigation /Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem`
+
+### Error
+```
+ExecaError: Command failed with exit code 128
+fatal: destination path '/Users/andrewsirulnik/claude_mcp_servers/mcp_server_filesystem' already exists and is not an empty directory.
+```
+
+### Insight
+The destination directory for cloning already exists and is not empty. This suggests that either a previous clone attempt was made or another process has created files in this directory. Need to investigate the existing directory before proceeding.
